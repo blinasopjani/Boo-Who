@@ -1,0 +1,114 @@
+{
+  "features": [
+    "height",
+    "rottingFleshPct",
+    "bloodCoverage",
+    "aura",
+    "hairLength",
+    "color_green",
+    "color_grey",
+    "color_purple",
+    "color_white"
+  ],
+  "numeric": [
+    "height",
+    "rottingFleshPct",
+    "bloodCoverage",
+    "aura",
+    "hairLength"
+  ],
+  "colors": [
+    "green",
+    "grey",
+    "purple",
+    "white"
+  ],
+  "classes": [
+    "Zombie",
+    "Witch",
+    "Ghost",
+    "Vampire",
+    "Mummy"
+  ],
+  "scaler": {
+    "height": {
+      "mean": 60.479933,
+      "std": 7.755515
+    },
+    "rottingFleshPct": {
+      "mean": 20.978922,
+      "std": 10.222738
+    },
+    "bloodCoverage": {
+      "mean": 19.281065,
+      "std": 12.004918
+    },
+    "aura": {
+      "mean": 0.197489,
+      "std": 0.084558
+    },
+    "hairLength": {
+      "mean": 3.46925,
+      "std": 0.418783
+    }
+  },
+  "train_range": {
+    "height": {
+      "min": 22.124607,
+      "max": 83.070259
+    },
+    "rottingFleshPct": {
+      "min": 1.53,
+      "max": 48.77
+    },
+    "bloodCoverage": {
+      "min": 0.0,
+      "max": 58.864
+    },
+    "aura": {
+      "min": 0.020161,
+      "max": 0.540366
+    },
+    "hairLength": {
+      "min": 1.943124,
+      "max": 5.388365
+    }
+  },
+  "class_means": {
+    "Zombie": {
+      "height": 58.039,
+      "rottingFleshPct": 29.925,
+      "bloodCoverage": 29.934,
+      "aura": 0.18,
+      "hairLength": 3.398
+    },
+    "Witch": {
+      "height": 61.969,
+      "rottingFleshPct": 19.973,
+      "bloodCoverage": 9.93,
+      "aura": 0.191,
+      "hairLength": 3.517
+    },
+    "Ghost": {
+      "height": 54.991,
+      "rottingFleshPct": 7.746,
+      "bloodCoverage": 5.039,
+      "aura": 0.269,
+      "hairLength": 3.3
+    },
+    "Vampire": {
+      "height": 67.999,
+      "rottingFleshPct": 10.02,
+      "bloodCoverage": 21.492,
+      "aura": 0.184,
+      "hairLength": 3.69
+    },
+    "Mummy": {
+      "height": 64.176,
+      "rottingFleshPct": 23.86,
+      "bloodCoverage": 13.572,
+      "aura": 0.192,
+      "hairLength": 3.579
+    }
+  }
+}

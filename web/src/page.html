@@ -1,0 +1,372 @@
+<title>Boo Who?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #0c1026;          /* midnight sky */
+    --ink-2: #151a3a;
+    --panel: rgba(12, 14, 34, 0.82);
+    --panel-edge: rgba(242, 169, 59, 0.28);
+    --moss: #2f5d3a;
+    --parchment: #f3e7c4;    /* moonlit parchment text */
+    --parchment-dim: #b9ae92;
+    --amber: #f2a93b;        /* lantern light */
+    --amber-deep: #b86f12;
+    --teal: #5fe0c8;         /* witchlight, the Oracle */
+    --blood: #c8413b;
+    --good: #7fdc8a;
+    --display: 'IM Fell English SC', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    --body: 'Alegreya Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--ink); color: var(--parchment); font-family: var(--body); font-size: 16px; line-height: 1.45; overflow: hidden; -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+
+  #app { position: fixed; inset: 0; overflow: hidden; }
+  #scene { position: absolute; inset: 0; }
+  #scene canvas { display: block; width: 100%; height: 100%; }
+
+  /* ---------- shared pieces ---------- */
+  .eyebrow { font-size: 0.78rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--amber); margin: 0; font-weight: 700; }
+  h1, h2 { font-family: var(--display); font-weight: 400; margin: 0; text-wrap: balance; line-height: 1.02; }
+  h2 { font-size: clamp(2rem, 5vw, 2.8rem); }
+  h3 { font-size: 0.8rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--parchment-dim); margin: 1.2rem 0 0.5rem; font-weight: 700; }
+  h3 small { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 0.4rem; }
+  p { margin: 0; }
+  .btn { appearance: none; border: 1px solid var(--amber); background: linear-gradient(180deg, #f6b650, var(--amber) 55%, var(--amber-deep)); color: #22160a; font-weight: 700;
+    padding: 0.7rem 1.3rem; border-radius: 4px; cursor: pointer; letter-spacing: 0.02em; box-shadow: 0 0 22px rgba(242, 169, 59, 0.35); transition: transform .12s, box-shadow .12s; }
+  .btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 30px rgba(242, 169, 59, 0.55); }
+  .btn.ghost { background: transparent; color: var(--parchment); border-color: rgba(243, 231, 196, 0.35); box-shadow: none; }
+  .btn.ghost:hover:not(:disabled) { border-color: var(--parchment); box-shadow: none; }
+  .btn.small { padding: 0.45rem 0.8rem; font-size: 0.9rem; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+  .row { display: flex; gap: 0.7rem; flex-wrap: wrap; align-items: center; }
+  .swatch { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 50%; margin-right: 0.4em; vertical-align: -0.05em; box-shadow: 0 0 8px currentColor; border: 1px solid rgba(0,0,0,.35); }
+  dl { margin: 0; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: 0.6rem; margin-top: 1.2rem; }
+  .facts > div { border-top: 1px solid var(--panel-edge); padding-top: 0.45rem; }
+  .facts dt { font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--parchment-dim); }
+  .facts dd { margin: 0.1rem 0 0; font-family: var(--display); font-size: 1.55rem; font-variant-numeric: tabular-nums; }
+
+  /* ---------- full-screen overlays ---------- */
+  .screen { position: absolute; inset: 0; display: flex; padding: max(24px, env(safe-area-inset-top, 0px)) 24px max(24px, env(safe-area-inset-bottom, 0px)); overflow-y: auto; z-index: 20; }
+  .panel { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 6px; padding: 1.6rem 1.7rem; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), inset 0 0 0 4px rgba(12, 14, 34, 0.6), inset 0 0 0 5px rgba(242, 169, 59, 0.12); max-width: 34rem; width: 100%; margin: auto; }
+
+  /* title */
+  #title { flex-direction: column; justify-content: space-between; background: linear-gradient(180deg, rgba(5, 8, 24, 0.82) 0%, rgba(5, 8, 24, 0.15) 45%, rgba(5, 8, 24, 0) 60%, rgba(5, 8, 24, 0.75) 100%); }
+  .title-top { max-width: 44rem; display: grid; gap: 0.6rem; }
+  .logo { font-size: clamp(3.4rem, 11vw, 7.5rem); color: var(--parchment); text-shadow: 0 0 28px rgba(242, 169, 59, 0.55), 0 2px 0 #2b1a06; letter-spacing: 0.01em; }
+  .logo span { color: var(--amber); }
+  .tagline, .title-top .eyebrow, .cast { text-shadow: 0 1px 3px #000, 0 0 14px rgba(5,8,24,.9); }
+  .tagline { font-size: clamp(1.05rem, 2.4vw, 1.3rem); max-width: 34rem; color: var(--parchment); }
+  .title-bottom { display: grid; gap: 0.8rem; justify-items: start; }
+  .cast { font-size: 0.85rem; color: var(--parchment-dim); letter-spacing: 0.04em; }
+  #bestLine { font-size: 0.9rem; color: var(--parchment-dim); font-variant-numeric: tabular-nums; }
+
+  /* how to play */
+  #howto .panel { max-width: 44rem; }
+  .steps { list-style: none; padding: 0; margin: 1.2rem 0 0; display: grid; gap: 0.9rem; counter-reset: s; }
+  .steps li { display: grid; grid-template-columns: 2.2rem 1fr; gap: 0.2rem 0.7rem; counter-increment: s; color: #e6dcc0; }
+  .steps li .weapon-table { grid-column: 2; }
+  .steps li::before { content: counter(s); font-family: var(--display); font-size: 1.6rem; color: var(--amber); line-height: 1; text-align: center; padding-top: 0.1rem; }
+  .weapon-table { display: grid; grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); gap: 0.35rem 1rem; margin-top: 0.4rem; font-size: 0.95rem; }
+  .weapon-table div { white-space: nowrap; }
+  .weapon-table span { color: var(--parchment-dim); }
+
+  /* journal */
+  #journal { justify-content: flex-end; align-items: stretch; }
+  #journal .panel { margin: 0; max-width: 27rem; overflow-y: auto; max-height: 100%; }
+  .jtabs { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.8rem 0 1rem; }
+  .jtab { border: 1px solid var(--panel-edge); background: transparent; padding: 0.3rem 0.7rem; border-radius: 3px; cursor: pointer; color: var(--parchment-dim); }
+  .jtab[aria-selected="true"] { background: var(--amber); color: #22160a; border-color: var(--amber); font-weight: 700; }
+  .lore { margin-top: 0.6rem; color: #ddd3b6; }
+  .weapon-line { margin-top: 0.9rem; }
+  .jstats, .jcolors { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.45rem; font-size: 0.93rem; }
+  .jstats li { display: grid; grid-template-columns: 7.5rem 1fr 3.3rem; gap: 0.6rem; align-items: center; }
+  .jstats b, .jcolors b { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+  .js-track { height: 6px; background: rgba(243, 231, 196, 0.12); border-radius: 3px; overflow: hidden; }
+  .js-fill { display: block; height: 100%; background: var(--amber); border-radius: 3px; }
+  .jcolors { grid-template-columns: repeat(2, 1fr); gap: 0.35rem 1.2rem; }
+  .jcolors li { display: flex; align-items: center; } .jcolors b { margin-left: auto; }
+
+  /* night intro, shop, end, pause */
+  #nightIntro, #shop, #end, #pause { background: radial-gradient(ellipse at center, rgba(5, 8, 24, 0.35), rgba(5, 8, 24, 0.8)); }
+  #introTitle, #endTitle { font-size: clamp(2.6rem, 8vw, 4rem); margin: 0.3rem 0 0.7rem; }
+  #introNote, #endText { color: #ddd3b6; }
+  #end.won #endTitle { color: var(--amber); text-shadow: 0 0 24px rgba(242, 169, 59, 0.5); }
+  #end:not(.won) #endTitle { color: #ff8a80; }
+  #endVersus .best { display: block; margin-top: 0.2rem; font-size: 0.85rem; color: var(--parchment-dim); }
+  #endVersus { margin-top: 1rem; padding: 0.7rem 0.9rem; border-left: 2px solid var(--teal); background: rgba(95, 224, 200, 0.07); color: var(--parchment); }
+  .shop-coins { font-family: var(--display); font-size: 1.4rem; color: var(--amber); margin-top: 0.6rem; font-variant-numeric: tabular-nums; }
+  .shop-items { list-style: none; padding: 0; margin: 1rem 0 1.2rem; display: grid; gap: 0.7rem; }
+  .shop-item { display: flex; gap: 1rem; justify-content: space-between; align-items: center; border-top: 1px solid var(--panel-edge); padding-top: 0.7rem; }
+  .shop-item h3 { margin: 0; color: var(--parchment); font-size: 1rem; letter-spacing: 0; text-transform: none; }
+  .shop-item p { font-size: 0.9rem; color: var(--parchment-dim); }
+  .shop-item .btn { flex: none; }
+  .panel .row { margin-top: 1.4rem; }
+
+  /* ---------- in-game HUD ---------- */
+  #hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+  #hud > * { pointer-events: auto; }
+  .topbar { position: absolute; top: 0; left: 0; right: 0; display: flex; gap: 1rem 1.4rem; align-items: center; flex-wrap: wrap;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px; background: linear-gradient(180deg, rgba(5, 8, 24, 0.85), rgba(5, 8, 24, 0)); }
+  .tb-night { display: grid; }
+  #hudNight { font-family: var(--display); font-size: 1.3rem; line-height: 1.1; }
+  #hudCount { font-size: 0.82rem; color: var(--parchment-dim); }
+  .tb-stat { display: grid; font-variant-numeric: tabular-nums; }
+  .tb-stat small { font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--parchment-dim); }
+  .tb-stat b { font-size: 1.15rem; font-weight: 700; }
+  #hudCoins::before { content: ''; display: inline-block; width: 0.7em; height: 0.7em; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ffe7a0, var(--amber) 55%, var(--amber-deep)); margin-right: 0.35em; }
+  .hearts { display: flex; gap: 5px; align-items: center; }
+  .heart { width: 14px; height: 20px; border-radius: 3px 3px 5px 5px; background: radial-gradient(circle at 50% 60%, #ffe08a, var(--amber) 55%, #7a3e05); box-shadow: 0 0 10px rgba(242, 169, 59, 0.8); position: relative; }
+  .heart::before { content: ''; position: absolute; left: 3px; right: 3px; top: -4px; height: 4px; background: #3f2918; border-radius: 2px 2px 0 0; }
+  .heart.lost { background: #2a2433; box-shadow: none; }
+  .tb-right { margin-left: auto; display: flex; gap: 0.5rem; }
+
+  #distance { pointer-events: none !important; position: absolute; left: 50%; transform: translateX(-50%); top: calc(74px + env(safe-area-inset-top, 0px)); width: min(22rem, calc(100% - 32px)); text-align: center; font-variant-numeric: tabular-nums; }
+  #distanceText { font-size: 0.85rem; letter-spacing: 0.08em; color: var(--parchment); text-shadow: 0 1px 4px #000; }
+  .dist-track { height: 6px; border-radius: 3px; background: rgba(243, 231, 196, 0.15); overflow: hidden; margin-top: 4px; }
+  #distanceFill { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--moss), var(--amber)); }
+  #distance.close #distanceFill { background: linear-gradient(90deg, var(--amber), var(--blood)); }
+  #distance.close #distanceText { color: #ffb4ab; }
+
+  .sidepanel { position: absolute; right: 16px; top: calc(76px + env(safe-area-inset-top, 0px)); width: 18.5rem; display: grid; gap: 0.7rem; max-height: calc(100% - 200px); overflow-y: auto; }
+  .sidepanel.left { right: auto; left: 16px; width: 17rem; }
+  .card { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 6px; padding: 0.8rem 0.9rem; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  .card h2 { font-size: 1.25rem; margin-bottom: 0.45rem; }
+  #clues { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+  .clue { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.9rem; padding: 0.28rem 0; border-bottom: 1px dashed rgba(243, 231, 196, 0.12); }
+  .clue:last-child { border-bottom: 0; }
+  .clue-label { color: var(--parchment-dim); }
+  .clue-value .num { color: var(--parchment-dim); font-size: 0.8em; margin-left: 0.35em; }
+  .clue-value { color: rgba(243, 231, 196, 0.38); font-size: 0.82rem; text-align: right; font-variant-numeric: tabular-nums; }
+  .clue.shown .clue-value { color: var(--parchment); font-size: 0.9rem; }
+  .clue.shown { animation: reveal .6s ease-out; }
+  .clue .word { color: var(--amber); }
+  @keyframes reveal { from { background: rgba(242, 169, 59, 0.25); } to { background: transparent; } }
+
+  .oracle { border-color: rgba(95, 224, 200, 0.4); }
+  .oracle h2 { color: var(--teal); }
+  #askOracle { width: 100%; border-color: var(--teal); background: linear-gradient(180deg, #86ecd9, var(--teal) 60%, #2c9e8a); color: #062822; box-shadow: 0 0 18px rgba(95, 224, 200, 0.35); }
+  .oracle-idle, .oracle-note { font-size: 0.82rem; color: var(--parchment-dim); margin-top: 0.5rem; }
+  .oracle-bars { list-style: none; padding: 0; margin: 0.6rem 0 0; display: grid; gap: 0.35rem; }
+  .oracle-bars li { display: grid; grid-template-columns: 4.3rem 1fr 2.6rem; gap: 0.5rem; align-items: center; font-size: 0.9rem; }
+  .ob-track { height: 8px; background: rgba(95, 224, 200, 0.12); border-radius: 4px; overflow: hidden; }
+  .ob-fill { display: block; height: 100%; background: var(--teal); border-radius: 4px; box-shadow: 0 0 8px var(--teal); }
+  .ob-pct { text-align: right; font-variant-numeric: tabular-nums; }
+  #oracleStale { font-size: 0.8rem; color: var(--amber); margin-top: 0.4rem; }
+
+  #weapons { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; width: min(44rem, calc(100% - 32px)); }
+  .weapon { position: relative; display: grid; justify-items: center; gap: 0.1rem; padding: 0.55rem 0.3rem 0.5rem; border-radius: 6px; cursor: pointer; background: var(--panel); border: 1px solid var(--panel-edge);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: transform .12s, border-color .12s, background .12s; }
+  .weapon:hover:not(:disabled) { transform: translateY(-3px); border-color: var(--amber); background: rgba(40, 28, 12, 0.85); }
+  .weapon:disabled { cursor: default; opacity: 0.55; }
+  .weapon.right { opacity: 1; border-color: var(--good); box-shadow: 0 0 18px rgba(127, 220, 138, 0.6); }
+  .weapon.wrong { opacity: 1; border-color: var(--blood); box-shadow: 0 0 18px rgba(200, 65, 59, 0.7); }
+  .weapon.picked { opacity: 1; border-color: var(--good); border-style: dashed; }
+  .w-key { position: absolute; top: 4px; left: 6px; font-size: 0.7rem; color: var(--parchment-dim); font-variant-numeric: tabular-nums; }
+  .w-icon { font-size: 1.6rem; line-height: 1.2; }
+  .w-name { font-weight: 700; font-size: 0.9rem; text-align: center; line-height: 1.15; }
+  .w-for { font-size: 0.75rem; color: var(--parchment-dim); }
+
+  .toast { position: absolute; left: 50%; transform: translateX(-50%); top: calc(118px + env(safe-area-inset-top, 0px)); z-index: 15; max-width: min(34rem, calc(100% - 32px)); width: max-content;
+    background: rgba(10, 12, 30, 0.96); border: 1px solid var(--panel-edge); border-radius: 6px; padding: 0.7rem 1rem; display: grid; gap: 0.2rem; text-align: center; animation: pop .25s ease-out; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+  .toast strong { font-family: var(--display); font-weight: 400; font-size: 1.35rem; line-height: 1.15; }
+  .toast span { font-size: 0.9rem; color: #ddd3b6; }
+  .toast.good { border-color: rgba(127, 220, 138, 0.6); } .toast.good strong { color: var(--good); }
+  .toast.bad { border-color: rgba(200, 65, 59, 0.7); } .toast.bad strong { color: #ff8a80; }
+  @keyframes pop { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+  #flash { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, rgba(200, 65, 59, 0) 30%, rgba(200, 65, 59, 0.6)); opacity: 0; z-index: 12; }
+  #flash.on { animation: flash .7s ease-out; }
+  @keyframes flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+  #loading { position: absolute; inset: 0; display: grid; place-items: center; background: var(--ink); z-index: 40; text-align: center; padding: 24px; }
+  #loading h1 { font-size: 3rem; color: var(--parchment); }
+  #loading p { color: var(--parchment-dim); margin-top: 0.6rem; }
+
+  /* ---------- phones ---------- */
+  @media (max-width: 760px) {
+    body { font-size: 15px; }
+    .topbar { gap: 0.4rem 0.9rem; padding-bottom: 6px; }
+    #hudNight { font-size: 1.05rem; }
+    .tb-right .btn { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+    #soundBtn, .tb-score { display: none; }
+    .oracle-note { display: none; }
+    .oracle-bars { margin-top: 0.4rem; gap: 0.2rem; }
+    .toast strong { font-size: 1.1rem; }
+    #distance { top: calc(64px + env(safe-area-inset-top, 0px)); width: calc(100% - 140px); left: 16px; transform: none; text-align: left; }
+    .sidepanel { left: 16px; right: 16px; width: auto; top: auto; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); max-height: 34%; grid-template-columns: 1fr; gap: 0.5rem; }
+    .sidepanel.left { width: auto; right: 16px; top: calc(100px + env(safe-area-inset-top, 0px)); bottom: auto; max-height: 30%; }
+    .card { padding: 0.6rem 0.7rem; }
+    .card h2 { display: none; }
+    #clues { grid-template-columns: 1fr 1fr; gap: 0.1rem 0.8rem; }
+    .clue { font-size: 0.78rem; flex-direction: column; gap: 0; padding: 0.15rem 0; }
+    .clue-value { text-align: left; font-size: 0.75rem; }
+    .clue.shown .clue-value { font-size: 0.8rem; }
+    .oracle-idle { display: none; }
+    #askOracle { padding: 0.45rem; font-size: 0.85rem; }
+    .w-for { display: none; } .w-icon { font-size: 1.3rem; } .w-name { font-size: 0.72rem; } .weapon { padding: 0.45rem 0.2rem 0.4rem; }
+    #weapons { gap: 5px; }
+    .toast { top: calc(100px + env(safe-area-inset-top, 0px)); }
+    #journal { align-items: flex-end; }
+    #journal .panel { max-height: 58%; max-width: none; }
+    .panel { padding: 1.2rem 1.1rem; }
+  }
+  @media (prefers-reduced-motion: reduce) { .clue.shown, .toast, #flash.on { animation: none; } .weapon, .btn { transition: none; } }
+</style>
+
+<div id="app">
+  <div id="scene" aria-hidden="true"></div>
+
+  <!-- in-game HUD -->
+  <div id="hud" hidden>
+    <header class="topbar">
+      <div class="tb-night"><span id="hudNight">Night 1</span><span id="hudCount"></span></div>
+      <div class="tb-stat"><small>Gate</small><span class="hearts" id="hearts" role="img"></span></div>
+      <div class="tb-stat"><small>Coins</small><b id="hudCoins">0</b></div>
+      <div class="tb-stat tb-score"><small>Score</small><b id="hudScore">0</b></div>
+      <div class="tb-right">
+        <button class="btn ghost small" id="soundBtn" type="button" aria-pressed="false">Sound on</button>
+        <button class="btn ghost small" id="pauseBtn" type="button">Pause</button>
+      </div>
+    </header>
+    <div id="distance" hidden><span id="distanceText">80 m to the gate</span><div class="dist-track"><span id="distanceFill"></span></div></div>
+    <aside class="sidepanel right">
+      <section class="card" aria-label="Clues">
+        <ul id="clues"></ul>
+      </section>
+    </aside>
+    <aside class="sidepanel left">
+      <section class="card oracle" aria-label="The Owl">
+        <h2>The Owl</h2>
+        <button class="btn small" id="askOracle" type="button">Ask · 6 coins</button>
+        <div id="oracleResult" aria-live="polite"></div>
+        <p id="oracleStale" hidden>New clues. Ask again?</p>
+      </section>
+    </aside>
+    <nav id="weapons" aria-label="Weapons"></nav>
+  </div>
+  <div id="toast" class="toast" hidden role="status"></div>
+  <div id="flash"></div>
+
+  <!-- title -->
+  <section class="screen" id="title" hidden>
+    <div class="title-top">
+      <p class="eyebrow">5 nights · 5 monsters · 1 gate</p>
+      <h1 class="logo">Boo <span>Who?</span></h1>
+      <p class="tagline">Read the clues. Pick the weapon. Hold the gate.</p>
+    </div>
+    <div class="title-bottom">
+      <div class="row">
+        <button class="btn" id="playBtn" type="button">Start</button>
+        <button class="btn ghost" id="howBtn" type="button">How to play</button>
+        <button class="btn ghost" id="journalBtn" type="button">Monsters</button>
+      </div>
+      <p id="bestLine"></p>
+    </div>
+  </section>
+
+  <!-- how to play -->
+  <section class="screen" id="howto" hidden>
+    <div class="panel">
+      <p class="eyebrow">How to play</p>
+      <h2>Hold the gate for 5 nights</h2>
+      <ol class="steps">
+        <li>A hooded monster walks toward the gate.</li>
+        <li>Six clues appear as it comes closer. Blood and rot, the best clues, come last.</li>
+        <li>Pick its weapon (keys 1 to 5). The earlier you pick, the more coins you earn.
+          <div class="weapon-table">
+            <div>⛏️ Shovel <span>· Zombie</span></div><div>💧 Holy water <span>· Witch</span></div><div>🧂 Salt circle <span>· Ghost</span></div><div>🧄 Garlic stake <span>· Vampire</span></div><div>🔥 Fire torch <span>· Mummy</span></div>
+          </div></li>
+        <li>Unsure? Pay the Owl (key O). It sees only the clues you see.</li>
+        <li>Wrong weapon or too late: the gate loses 1 of its 5 lanterns. Lose all 5 and you lose.</li>
+      </ol>
+      <div class="row">
+        <button class="btn" id="howPlay" type="button">Start</button>
+        <button class="btn ghost back-title" type="button">Back</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- journal -->
+  <section class="screen" id="journal" hidden>
+    <div class="panel">
+      <p class="eyebrow">Monsters</p>
+      <div class="jtabs" id="journalTabs" role="tablist" aria-label="Monsters"></div>
+      <div id="journalPage"></div>
+      <div class="row"><button class="btn ghost back-title" type="button">Back</button></div>
+    </div>
+  </section>
+
+  <!-- night intro -->
+  <section class="screen" id="nightIntro" hidden>
+    <div class="panel">
+      <p class="eyebrow" id="introEyebrow">Night 1 of 5</p>
+      <h2 id="introTitle">First Moon</h2>
+      <p id="introNote"></p>
+      <dl class="facts" id="introFacts"></dl>
+      <div class="row"><button class="btn" id="introGo" type="button">Open the gate</button></div>
+    </div>
+  </section>
+
+  <!-- shop -->
+  <section class="screen" id="shop" hidden>
+    <div class="panel">
+      <p class="eyebrow">Village market</p>
+      <h2 id="shopTitle">Dawn</h2>
+      <p id="shopSub"></p>
+      <p class="shop-coins"><span id="shopCoins">0</span> coins</p>
+      <ul class="shop-items" id="shopItems"></ul>
+      <div class="row"><button class="btn" id="shopGo" type="button">Next night</button></div>
+    </div>
+  </section>
+
+  <!-- end -->
+  <section class="screen" id="end" hidden>
+    <div class="panel">
+      <p class="eyebrow" id="endEyebrow">Dawn breaks</p>
+      <h2 id="endTitle">The village is safe</h2>
+      <p id="endText"></p>
+      <dl class="facts" id="endStats"></dl>
+      <p id="endVersus"></p>
+      <div class="row">
+        <button class="btn" id="againBtn" type="button">Play again</button>
+        <button class="btn ghost back-title" type="button">Menu</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- pause -->
+  <section class="screen" id="pause" hidden>
+    <div class="panel">
+      <p class="eyebrow">Paused</p>
+      <h2>The monster waits</h2>
+      <div class="row">
+        <button class="btn" id="resumeBtn" type="button">Resume</button>
+        <button class="btn ghost" id="quitBtn" type="button">Quit to title</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="loading"><div><h1>Boo Who?</h1><p id="loadingText">Lighting the lanterns…</p></div></div>
+</div>
+
+<script>
+  // if the 3D engine cannot load (no internet), say so instead of a blank screen
+  setTimeout(function () {
+    if (!window.__nightWatchReady) {
+      var t = document.getElementById('loadingText');
+      if (t) t.textContent = 'The 3D engine did not load. Check your internet connection and reload the page. Boo Who? needs WebGL and an internet connection the first time.';
+    }
+  }, 15000);
+</script>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
+<script type="module">
+/*__MODULE__*/
+</script>
