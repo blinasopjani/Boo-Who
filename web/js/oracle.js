@@ -43,3 +43,11 @@ export function consult(model, monster, cluesShown) {
     .map((cls, i) => ({ cls, p: probs[i] }))
     .sort((a, b) => b.p - a.p);
 }
+
+// Any-order Owl (notebook 03): one network per combination of found clues.
+// mask = bit i set when clue owl.clue_order[i] has been found. Returns probabilities in model.classes order.
+export function consultMask(model, owl, monster, mask) {
+  if (!mask) return owl.prior.slice();
+  const net = owl.nets[String(mask)];
+  return forward(net.layers, prepare(model, monster, net.features));
+}
