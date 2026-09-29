@@ -981,7 +981,7 @@ function makeWeapon(cls) {
 
 // render each weapon once into a small picture, for the weapon buttons and the journal
 function renderWeaponIcons(classes) {
-  const size = 160, r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  const size = 256, r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   r.setSize(size, size); r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping;
   const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
   sc.add(new THREE.HemisphereLight('#c7d2e8', '#1a140e', 1.4));

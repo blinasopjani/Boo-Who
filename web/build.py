@@ -17,7 +17,8 @@ WEB = ROOT / 'web'
 
 model = json.loads((WEB / 'data' / 'oracle_model.json').read_text())
 monsters = json.loads((WEB / 'data' / 'monsters.json').read_text())
-owl_any = json.loads((WEB / 'data' / 'owl_subsets.json').read_text())
+brain = json.loads((WEB / 'data' / 'owl_brain.json').read_text())          # the Owl's network (notebook 05)
+onnx_b64 = base64.b64encode((WEB / 'data' / 'owl_brain.onnx').read_bytes()).decode()
 tells = json.loads((WEB / 'data' / 'tells.json').read_text())
 prep = json.loads((ROOT / 'data' / 'clean' / 'preprocessing.json').read_text())
 train = pd.read_csv(ROOT / 'data' / 'monster_train.csv')
@@ -26,12 +27,12 @@ classes, colors = model['classes'], model['colors']
 rows = [[classes.index(m['class']), round(m['height'], 3), round(m['rottingFleshPct'], 3), round(m['bloodCoverage'], 3),
          round(m['aura'], 4), round(m['hairLength'], 3), colors.index(m['color']), int(m['trickster'])] for m in monsters]
 
-lore = {
-    'Zombie': 'Graveyard shambler. The most rot and the most blood.',
-    'Witch': 'Swamp flyer. Half rotten, little blood, glows green or purple.',
-    'Ghost': 'Shortest, brightest aura, almost no blood. Usually glows white.',
-    'Vampire': 'Tallest, longest hair. Bloodstained but barely rotten.',
-    'Mummy': 'Tall and rotten. The rarest monster and the hardest to read.',
+lore = {   # how to spot each monster, from its rules (notebook 04)
+    'Zombie': 'Rotten and bloody.',
+    'Witch': 'Clean hands, glows green or purple.',
+    'Ghost': 'Small, clean, glows white.',
+    'Vampire': 'Giant and bloody, not rotten.',
+    'Mummy': 'Rotten and tall, glows grey or white.',
 }
 color_share = (pd.crosstab(train['class'], train['color'], normalize='index') * 100).round(1)
 journal = {c: {'lore': lore[c], 'means': prep['class_means'][c], 'colors': color_share.loc[c].to_dict()} for c in classes}
@@ -55,7 +56,9 @@ module = '\n'.join([
     'const MODEL_DATA = ' + json.dumps(model_data) + ';',
     oracle_js,
     'const ORACLE_MODEL = ' + json.dumps(model, separators=(',', ':')) + ';',
-    'const OWL_ANY = ' + json.dumps(owl_any, separators=(',', ':')) + ';',
+    'const OWL_BRAIN = ' + json.dumps(brain, separators=(',', ':')) + ';',
+    'const OWL_ONNX = ' + json.dumps(onnx_b64) + ';',
+    (WEB / 'js' / 'brain.js').read_text(),
     'const TELLS = ' + json.dumps(tells, separators=(',', ':')) + ';',
     'const MONSTER_ROWS = ' + json.dumps(rows, separators=(',', ':')) + ';',
     'const JOURNAL = ' + json.dumps(journal, separators=(',', ':')) + ';',
@@ -72,4 +75,5 @@ full = ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
 (WEB / 'index.html').write_text(full)
 (ROOT / 'docs').mkdir(exist_ok=True)
 (ROOT / 'docs' / 'index.html').write_text(full)   # GitHub Pages serves this folder
+print(f'Owl brain: {len(onnx_b64) * 3 // 4 / 1024:.1f} KB ONNX model')
 print(f'index.html: {len(full) / 1024:.0f} KB ({sum(len(v) for v in model_data.values()) / 1024:.0f} KB of 3D models), {len(rows)} monsters, {len(model["stages"])} Oracle stages')

@@ -1,6 +1,6 @@
 // ============================================================
 // Boo Who? · game logic, HUD and screens (version 2: the lantern and the monster cards)
-// Globals from the build: ORACLE_MODEL, OWL_ANY, MONSTER_ROWS, JOURNAL, consult(), consultMask()
+// Globals from the build: ORACLE_MODEL, MONSTER_ROWS, JOURNAL, TELLS, OWL_BRAIN and Brain (the Owl's neural network, notebook 05)
 // ============================================================
 
 const CLASSES = ORACLE_MODEL.classes;                          // Zombie, Witch, Ghost, Vampire, Mummy
@@ -22,14 +22,19 @@ const PLURAL = { Zombie: 'Zombies', Witch: 'Witches', Ghost: 'Ghosts', Vampire: 
 const NIGHTS = [
   { name: 'First Moon', count: 5, walk: 36, trick: 0, mood: 'normal', note: '5 slow monsters. Ask about the face, hands, shadow and eyes.' },
   { name: 'Night of Crows', count: 6, walk: 32, trick: 0, mood: 'normal', note: '6 monsters, walking faster.' },
-  { name: 'Fog Night', count: 7, walk: 29, trick: 0.1, mood: 'fog', note: 'Tricksters appear: they break one of their own rules. A wrong guess on one costs nothing.' },
+  { name: 'Fog Night', count: 7, walk: 29, trick: 0.1, mood: 'fog', note: 'Only 3 questions per monster from tonight. Tricksters appear: they break one of their rules.' },
   { name: 'Blood Moon', count: 8, walk: 26, trick: 0.15, mood: 'blood', note: 'A red moon and more tricksters.' },
   { name: 'Halloween', count: 9, walk: 23, trick: 0.2, mood: 'halloween', note: 'The last night. Survive it to win.' },
 ];
 const PATH_METERS = 50;
 const MAX_HEARTS = 5;
 const HINT_COST = 5;
-const ASK_TIME = 0.7;                                             // seconds the lantern takes to look at a body part
+const ASK_TIME = 0.7;
+const JUMP_METERS = 10;                                            // a wrong card makes the monster rush this far closer
+function maxQuestions() { return G.night >= 2 ? 3 : 4; }            // from Fog Night, only 3 questions per monster
+function speedMul() {                                              // every question and a hot streak make it walk faster
+  return (1 + 0.1 * G.asked.size) * (G.streak >= 3 ? 1.1 : 1);
+}                                             // seconds the lantern takes to look at a body part
 
 // ---------- the four questions and each monster's rules (from notebooks/04_monster_rules.ipynb) ----------
 const QUESTIONS = TELLS.questions;                                // rot, blood, height, color
@@ -232,7 +237,6 @@ canvasHost.appendChild(renderer.domElement);
 
 await loadModels((f) => { $('#loadingText').textContent = `Waking the dead... ${Math.round(f * 100)}%`; });
 const WEAPON_ICONS = renderWeaponIcons(CLASSES);
-const PORTRAITS = renderMonsterPortraits(CLASSES);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 900);
@@ -431,7 +435,7 @@ const G = {
   upgrades: { favor: false, draught: false },
   monster: null, progress: 0, asked: new Set(), asking: null, queue: [], inNight: 0, paused: false,
   resolveTimer: 0, resolveMode: null, actor: null, u: 0.86, lead: 0, noDamage: false,
-  flipped: new Set(), owlZone: null, owlFinal: false, tipShown: false,
+  flipped: new Set(), owlZone: null, owlFinal: false, tipShown: false, missed: false, tried: new Set(),
   stats: { met: 0, right: 0, oracleRight: 0, hints: 0, tricksMet: 0, tricksBeaten: 0, earned: 0, bestStreak: 0, questions: 0 },
 };
 
@@ -466,6 +470,7 @@ function showNightIntro() {
   $('#introFacts').innerHTML = `
     <div><dt>Monsters</dt><dd>${cfg.count}</dd></div>
     <div><dt>Gate</dt><dd>${G.hearts}/${MAX_HEARTS}</dd></div>
+    <div><dt>Questions</dt><dd>${G.night >= 2 ? 3 : 4} each</dd></div>
     <div><dt>Tricksters</dt><dd>${cfg.trick ? Math.round(cfg.trick * 100) + '%' : 'none'}</dd></div>`;
   $('#hud').hidden = true;
   show('nightIntro');
@@ -481,7 +486,9 @@ function startNight() {
 function nextMonster() {
   if (G.queue.length === 0) return endNight();
   G.monster = G.queue.shift(); G.inNight++;
-  Object.assign(G, { progress: 0, asked: new Set(), asking: null, resolveMode: null, owlZone: null, owlFinal: false, lead: 1.2, faceWaiting: false });
+  const tutorial = tutorialWanted() && tutorialMonster();
+  if (tutorial) G.monster = tutorial;
+  Object.assign(G, { progress: 0, asked: new Set(), asking: null, resolveMode: null, owlZone: null, owlFinal: false, lead: 1.2, missed: false, tried: new Set() });
   Object.values(walkers).forEach((w) => { w.group.visible = false; });
   stranger = walkers[G.monster.cls]; stranger.reset(); stranger.group.visible = true;
   G.boss = G.night === NIGHTS.length - 1 && G.queue.length === 0;
@@ -492,11 +499,13 @@ function nextMonster() {
   cameraMode = 'game';
   resetClues(); resetCards(); setCardsEnabled(true); updateCards(false);
   updateHud(); updateDistance();
-  if (G.boss) { banner('<strong>The Monster King</strong><span>Triple points. A wrong guess costs 2 lanterns</span>', 'bad', 4500); Sound.sting(); cam.shake = 0.5; }
+  if (G.boss) { banner('<strong>The Monster King</strong><span>Triple points. No second chance: a wrong guess costs 2 lanterns</span>', 'bad', 4500); Sound.sting(); cam.shake = 0.5; }
+  else if (tutorial) banner('');
   else if (G.night === 0 && !G.tipShown) banner(`${isTouch ? 'Tap' : 'Click'} its face, hands, shadow or eyes to ask a question`, 'tip', 6000);
   else banner(`Monster ${G.inNight} of ${NIGHTS[G.night].count}`, 'tip', 1600);
   placeOnPath(stranger.group, 0);
   setCameraTargets(0); cam.fov = cam.wantFov; cam.pos.copy(cam.wantPos); cam.look.copy(cam.wantLook);
+  if (tutorial) startTutorial(); else tutorialNextMonster();
 }
 
 function walkSeconds() {
@@ -514,20 +523,30 @@ function placeOnPath(obj, progress) {
 // ---------- questions: four buttons above the cards (or click the body part) ----------
 function resetClues() {
   $('#clues').innerHTML = QUESTIONS.map((q) => `
-    <li><button type="button" class="chip" data-q="${q}"><span class="chip-label">${Q[q].label}</span><span class="chip-value"><span class="ask">ask · </span>${Q[q].where}</span></button></li>`).join('');
+    <li><button type="button" class="chip" data-q="${q}"><span class="chip-label">${Q[q].where}</span><span class="chip-value">${Q[q].label.toLowerCase()}?</span></button></li>`).join('');
   $$('.chip').forEach((b) => b.addEventListener('click', () => ask(b.dataset.q)));
 }
 function isAsked(q) { return G.asked.has(q); }
+// after an answer, every card shows just that rule for a moment, so you can see why cards turn over
+let peekTimer;
+function peekRule(q) { const hud = $('#hud'); hud.dataset.peek = q; clearTimeout(peekTimer); peekTimer = setTimeout(() => { delete hud.dataset.peek; }, 2800); }
+function setRules(on) {
+  $('#hud').classList.toggle('show-rules', on); $('#rulesBtn').setAttribute('aria-pressed', String(on));
+  safeSet('boowho-rules', on ? '1' : '0');
+}
 function ask(q) {
   if (G.state !== 'play' || G.paused || G.resolveMode || !G.monster || !QUESTIONS.includes(q) || isAsked(q) || G.asking) return;
-  G.asking = { q, t: 0 }; G.lookZone = q; G.lookTimer = 99; Sound.question();
+  if (G.asked.size >= maxQuestions()) { banner(`Only ${maxQuestions()} questions tonight. Pick a card`, 'bad', 2400); return; }
+  if (TUT.on && (TUT.step === 'intro' || TUT.step === 'cards' || (TUT.step === 'face' && q !== 'rot'))) return;   // the tutorial waits for its step
+  G.asking = { q, t: 0 }; G.lookZone = q; G.lookTimer = 99; Sound.question(); tutorialAsking();
   const chip = $(`.chip[data-q="${q}"]`); if (chip) chip.classList.add('asking');
 }
 function answer(q) {
   const m = G.monster, lv = levelOf(m, q), word = levelWord(q, lv), chip = $(`.chip[data-q="${q}"]`);
   G.asked.add(q); G.asking = null; G.stats.questions++; G.lookTimer = 1.5;
   chip.classList.remove('asking'); chip.classList.add('found'); chip.disabled = true;
-  chip.querySelector('.chip-value').innerHTML = q === 'color' ? `<span class="swatch" style="background:${GLOW_COLORS[m.color]}"></span>${word}` : word;
+  chip.querySelector('.chip-value').innerHTML = q === 'color' ? `<span class="swatch" style="background:${GLOW_COLORS[m.color]}"></span>${word}` : `<span class="chip-q">${Q[q].label.toLowerCase()}: </span>${word}`;
+  peekRule(q);
   if (q === 'color') { stranger.reveal('color', m, 0); stranger.setAuraColor(GLOW_COLORS[m.color]); }
   else stranger.reveal(q, m, percentile(q, m[Q[q].field]));
   popWord(q, `${Q[q].label}: ${word}`);
@@ -535,8 +554,10 @@ function answer(q) {
   Sound.found();
   if (G.owlZone === q) { G.owlZone = null; $('#owlMark').hidden = true; }
   $$(`.rule-row[data-q="${q}"]`).forEach((row) => { row.dataset.answer = lv; });      // show the answer on every card
+  if (G.asked.size >= maxQuestions()) $$('.chip:not(.found)').forEach((c) => { c.disabled = true; c.classList.add('locked'); c.querySelector('.chip-value').textContent = 'no more'; });
   updateCards(true);
-  if (!G.tipShown) { G.tipShown = true; setTimeout(() => { if (G.state === 'play' && !G.resolveMode) banner('Cards whose rules don’t match turn over', 'tip', 3200); }, 900); }
+  tutorialAnswer();
+  if (!G.tipShown) { G.tipShown = true; setTimeout(() => { if (G.state === 'play' && !G.resolveMode && ($('#banner').hidden || !$('#banner').classList.contains('owl'))) banner('Cards that don’t match turn over. Each question makes it walk faster', 'tip', 3600); }, 900); }
 }
 const pops = [];
 function popWord(zone, text) {
@@ -562,11 +583,11 @@ function ruleRows(c) {
 }
 function buildCards() {
   $('#cards').innerHTML = CLASSES.map((c, i) => `
-    <button class="card" data-cls="${c}" id="card-${c}" type="button" aria-label="${c}">
+    <button class="card" data-cls="${c}" id="card-${c}" type="button" aria-label="${WEAPONS[c].name}, for the ${c}">
       <span class="card-inner">
-        <span class="card-face"><span class="c-key">${i + 1}</span><img class="c-portrait" src="${PORTRAITS[c]}" alt=""><img class="c-weapon" src="${WEAPON_ICONS[c]}" alt="" title="${WEAPONS[c].name}">
-          <span class="c-info"><span class="c-name">${c}</span><span class="c-rules">${ruleRows(c)}</span></span></span>
-        <span class="card-back"><span class="c-key">${i + 1}</span><span class="c-back-name">${c}</span><span class="c-back-note"></span></span>
+        <span class="card-face"><img class="c-tool" src="${WEAPON_ICONS[c]}" alt="">
+          <span class="c-info"><span class="c-name">${WEAPONS[c].name}</span><span class="c-for">${c}</span><span class="c-rules">${ruleRows(c)}</span></span></span>
+        <span class="card-back"><span class="c-back-name">${WEAPONS[c].name}</span><span class="c-for">${c}</span><span class="c-back-note"></span></span>
       </span>
     </button>`).join('');
   $$('.card').forEach((b) => b.addEventListener('click', () => choose(b.dataset.cls)));
@@ -574,7 +595,7 @@ function buildCards() {
 function setCardsEnabled(on) { $$('.card').forEach((b) => { b.disabled = !on; }); }
 function resetCards() {
   G.flipped = new Set();
-  $$('.card').forEach((b, i) => { b.style.setProperty('--d', `${i * 70}ms`); b.classList.remove('flipped', 'right', 'wrong', 'answer', 'last', 'shake'); });
+  $$('.card').forEach((b, i) => { b.style.setProperty('--d', `${i * 70}ms`); b.classList.remove('flipped', 'right', 'wrong', 'answer', 'last', 'shake'); b.disabled = false; });
   $$('.rule-row').forEach((r) => { delete r.dataset.answer; });
 }
 function upCards() { return CLASSES.filter((c) => !G.flipped.has(c)); }
@@ -593,9 +614,9 @@ function updateCards(withSound) {
   if (changed && withSound) Sound.flip();
   $$('.card').forEach((b) => b.classList.toggle('last', up.length === 1 && b.dataset.cls === up[0]));
   if (withSound) {
-    if (up.length === 1) banner(`Only the ${up[0]} fits. Pick it!`, 'owl', 3200);
+    if (up.length === 1) banner(`Only the ${WEAPONS[up[0]].name.toLowerCase()} fits. Use it!`, 'owl', 3200);
     else if (up.length === 0) banner('No card fits. A trickster! Make your best guess', 'bad', 3800);
-    else if (G.asked.size === QUESTIONS.length) banner(`${up.length} cards fit. Pick one, or ask the Owl`, 'owl', 4000);
+    else if (G.asked.size >= maxQuestions()) banner(`${up.length} cards fit. Pick one, or ask the Owl`, 'owl', 4000);
   }
   updateOwlButton();
 }
@@ -603,48 +624,63 @@ function updateCards(withSound) {
 // ---------- the Owl: which question to ask next, and (at the end) which card is more common ----------
 function updateOwlButton() {
   const busy = G.state !== 'play' || G.resolveMode !== null;
-  const done = G.asked.size === QUESTIONS.length, up = upCards();
-  $('#askOracle').innerHTML = `<span>${done ? 'Which one?' : '<span class="owl-long">Ask the </span>Owl'}</span><small>${hintCost()} coins</small>`;
+  const done = G.asked.size >= maxQuestions(), up = upCards();
+  $('#askOracle').innerHTML = `<span>${done ? '<span class="owl-long">Which one?</span><span class="owl-short">Owl</span>' : 'Owl'}</span><small>${hintCost()} coins</small>`;
   $('#askOracle').disabled = busy || G.coins < hintCost() || up.length === 1 || G.owlZone !== null || G.owlFinal || !!G.asking;
 }
-function bestQuestion() {
-  // the question that, on average, turns over the most of the cards still up
-  const up = upCards(); let best = null, bestScore = -1;
-  for (const q of QUESTIONS) {
-    if (isAsked(q)) continue;
-    let score = 0;
-    for (const c of up) for (const lv of RULES[c][q]) score += up.filter((d) => !RULES[d][q].includes(lv)).length / RULES[c][q].length;
-    if (score > bestScore) { bestScore = score; best = q; }
-  }
-  return best;
+function askedMask() { return QUESTIONS.reduce((a, q, i) => a | (isAsked(q) ? 1 << i : 0), 0); }
+function askedLevels() { return QUESTIONS.map((q) => (isAsked(q) ? levelOf(G.monster, q) : -1)); }
+function bestQuestion() { return Brain.advise(askedLevels()); }     // highest expected information gain (notebook 05)
+// the Owl's belief about the monster, shifted to how often the game sends each monster
+function owlBelief(m, mask) { return Brain.toGame(Brain.predictSync(m, mask), CLASS_WEIGHT); }
+function owlBars(p, pool) {
+  const tot = pool.reduce((a, c) => a + p[CLASSES.indexOf(c)], 0) || 1;
+  return pool.map((c) => ({ c, v: p[CLASSES.indexOf(c)] / tot })).sort((a, b) => b.v - a.v);
 }
-function askOracle() {
+async function askOracle() {
   if ($('#askOracle').disabled) return;
   G.coins -= hintCost(); G.stats.hints++;
-  const warn = G.night >= 2 && isTrick(G.monster) ? ' · careful, this one breaks a rule' : '';
-  if (G.asked.size < QUESTIONS.length) {
-    const q = bestQuestion(); G.owlZone = q;
-    banner(Q[q].ask + warn, 'owl', 4000);
-  } else {
-    // all four answers are in: the neural network from notebook 03 says which card is most common for monsters like this
-    const mask = ['color', 'height', 'rot', 'blood'].reduce((a, k) => a | (1 << OWL_ANY.clue_order.indexOf(k)), 0);
-    const p = consultMask(ORACLE_MODEL, OWL_ANY, G.monster, mask);
-    const pool = upCards().length ? upCards() : CLASSES;
-    const top = pool.slice().sort((a, b) => p[CLASSES.indexOf(b)] - p[CLASSES.indexOf(a)])[0];
-    banner(`Monsters like this are most often a ${top}`, 'owl', 4500); G.owlFinal = true;
-  }
+  const warn = G.night >= 2 && isTrick(G.monster) ? '<span>Careful, this one breaks a rule</span>' : '';
   Sound.oracle(); owl.ask(); updateHud();
+  if (G.asked.size < maxQuestions()) {
+    const a = bestQuestion(); G.owlZone = a.q; updateOwlButton();
+    banner(`<strong>${Q[a.q].ask}</strong>${warn}`, 'owl', 4000);
+  } else {
+    // all answers are in: the network says which card is most likely
+    G.owlFinal = true; updateOwlButton();
+    const m = G.monster, mask = askedMask(), pool = upCards().length ? upCards() : CLASSES;
+    const bars = owlBars(owlBelief(m, mask), pool).slice(0, 3), top = bars[0].c;
+    if (G.monster !== m || G.resolveMode) return;
+    banner(`<strong>Most likely the ${WEAPONS[top].name.toLowerCase()}</strong>
+      <span class="mind">${bars.map((b) => `<i class="m-row"><b>${b.c}</b><i class="m-bar"><i style="width:${(b.v * 100).toFixed(0)}%"></i></i><em>${Math.round(b.v * 100)}%</em></i>`).join('')}</span>${warn}`, 'owl', 5000);
+  }
 }
 
 // ---------- choosing a card: the jump scare ----------
 function choose(cls) {
-  if (G.state !== 'play' || G.resolveMode) return;
-  Sound.click(); useWeapon(cls); resolve(cls);
+  if (G.state !== 'play' || G.resolveMode || G.tried.has(cls)) return;
+  if (TUT.on && TUT.step !== 'play') return;       // the tutorial asks you to find out first
+  if (TUT.hold) { TUT.hold = false; coach(null); }
+  Sound.click();
+  // first wrong card: the monster rushes 10 m closer and you get one more try (not tricksters, not the Monster King)
+  if (cls !== G.monster.cls && !G.missed && !isTrick(G.monster) && !G.boss) return secondChance(cls);
+  useWeapon(cls); resolve(cls);
+}
+function secondChance(cls) {
+  G.missed = true; G.tried.add(cls); G.streak = 0; G.stats.misses = (G.stats.misses || 0) + 1;
+  const card = $(`#card-${cls}`);
+  card.classList.add('flipped', 'shake'); card.disabled = true; card.querySelector('.c-back-note').textContent = 'wrong guess';
+  G.flipped.add(cls);
+  Sound.wrong(); flash('red'); cam.shake = 0.5;
+  G.progress = Math.min(1, G.progress + JUMP_METERS / PATH_METERS);
+  updateHud(); updateDistance(); updateCards(false);
+  if (G.progress >= 1) return resolve(null);
+  banner(`<strong>The ${WEAPONS[cls].name.toLowerCase()} does nothing!</strong><span>It is not a ${cls}. It rushes ${JUMP_METERS} m closer. One more try</span>`, 'bad', 3200);
 }
 function resolve(choice) {
   const m = G.monster, right = choice === m.cls, unused = QUESTIONS.length - G.asked.size, trick = isTrick(m);
-  const oracleTop = consult(ORACLE_MODEL, m, 6)[0].cls;
-  G.stats.met++; if (oracleTop === m.cls) G.stats.oracleRight++;
+  const owlP = owlBelief(m, askedMask()), owlTop = CLASSES[owlP.indexOf(Math.max(...owlP))];   // the Owl's guess with the same questions you asked
+  G.stats.met++; if (owlTop === m.cls) G.stats.oracleRight++;
   if (trick) G.stats.tricksMet++;
   setCardsEnabled(false);
   if (choice) $(`#card-${choice}`).classList.add(right ? 'right' : 'wrong');
@@ -663,11 +699,12 @@ function resolve(choice) {
   if (right) {
     G.noDamage = false; G.streak++; G.stats.bestStreak = Math.max(G.stats.bestStreak, G.streak);
     const mult = Math.min(5, G.streak);
-    const coins = 3 + unused * 2 + (mult >= 3 ? 2 : 0) + (G.boss ? 20 : 0), pts = (100 + unused * 60) * mult * (trick ? 2 : 1) * (G.boss ? 3 : 1);
+    const coins = 3 + unused * 2 + (mult >= 3 ? 2 : 0) + (G.boss ? 20 : 0), pts = Math.round((100 + unused * 60) * mult * (trick ? 2 : 1) * (G.boss ? 3 : 1) * (G.missed ? 0.5 : 1));
     G.coins += coins; G.stats.earned += coins; G.score += pts; G.stats.right++;
     if (trick) G.stats.tricksBeaten++;
     G.resolveMode = 'defeat';
     msg = G.boss ? `The Monster King falls!` : `${m.cls}! Right`;
+    if (G.streak === 3) setTimeout(() => { if (G.state === 'play') banner('<strong>Streak x3</strong><span>Monsters walk faster while your streak lasts</span>', 'owl', 3200); }, 3200);
     sub = `+${pts} points · +${coins} coins${mult > 1 ? ` · streak x${mult}` : ''}`;
     setTimeout(() => Sound.win(), 1250);
     scorePop(`+${pts}`, 'good');
@@ -680,8 +717,10 @@ function resolve(choice) {
     if (choice) { const card = $(`#card-${choice}`); card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); }
   }
   if (trick && right) sub += ' · trickster, double points';
-  banner(`<strong>${msg}</strong><span>${sub}</span>`, right ? 'good' : 'bad', 2800);
+  const owlLine = owlTop === m.cls ? `The Owl guessed ${owlTop} too` : `The Owl guessed ${owlTop}`;
+  banner(`<strong>${msg}</strong><span>${sub}</span><span class="owl-line">${owlLine}</span>`, right ? 'good' : 'bad', 2800);
   G.resolveTimer = 0; updateHud();
+  if (TUT.on) endTutorial(true);
 }
 function afterResolve() {
   if (G.actor) G.actor.group.visible = false;
@@ -743,7 +782,8 @@ function endGame(won) {
     <div><dt>Best streak</dt><dd>x${Math.min(5, s.bestStreak)}</dd></div>
     <div><dt>You vs Owl</dt><dd>${pct(s.right, s.met)}% · ${pct(s.oracleRight, s.met)}%</dd></div>`;
   $('#endVersus').textContent = !s.met ? '' : s.right > s.oracleRight ? 'You beat the Owl!'
-    : s.right === s.oracleRight ? 'You tied with the Owl.' : 'The Owl did better. Ask all four questions before you pick.';
+    : s.right === s.oracleRight ? 'You tied with the Owl.' : 'The Owl did better. Ask one more question before you pick.';
+  $('#endVersus').insertAdjacentHTML('beforeend', '<span class="best">The Owl only saw the answers to the questions you asked.</span>');
   $('#endVersus').insertAdjacentHTML('beforeend', `<span class="best">Best score: ${best.toLocaleString()} · ${s.met ? (s.questions / s.met).toFixed(1) : 0} questions per monster</span>`);
   $('#endBoard').innerHTML = `<h3>Best scores <small>today's record: ${todayBest.toLocaleString()}</small></h3>` + board.map((b, i) =>
     `<li class="${b.id === entry.id ? 'me' : ''}"><span>${i + 1}</span><b>${b.score.toLocaleString()}</b><em>${b.won ? 'Won' : `Night ${b.night}`}</em><time>${b.date.slice(5).replace('-', '/')}</time></li>`).join('');
@@ -794,11 +834,88 @@ function openJournalPage(i) {
   $$('.jtab').forEach((b, k) => b.setAttribute('aria-selected', String(k === i)));
   $('#journalPage').innerHTML = `
     <h2>${c}</h2>
-    <p class="lore">${j.lore}</p>
-    <p class="weapon-line"><img src="${WEAPON_ICONS[c]}" alt=""> Weapon: <b>${WEAPONS[c].name.toLowerCase()}</b></p>
-    <h3>Rules <small>lit boxes are what a ${c.toLowerCase()} can have</small></h3>
+    <p class="lore"><b>Spot it:</b> ${j.lore}</p>
+    <p class="weapon-line"><img src="${WEAPON_ICONS[c]}" alt=""> Weapon: <b>${WEAPONS[c].name}</b></p>
+    <h3>Rules <small>lit = it can have this</small></h3>
     <div class="j-rules">${QUESTIONS.map((q) => `<div class="j-rule"><span>${Q[q].label} <small>(${Q[q].where})</small></span><div>${[0, 1, 2, 3].map((lv) =>
       `<em class="${RULES[c][q].includes(lv) ? 'on' : ''}"${q === 'color' ? ` style="--glow:${GLOW_COLORS[TELLS.colors[lv]]}"` : ''}>${levelWord(q, lv)}</em>`).join('')}</div></div>`).join('')}</div>`;
+}
+
+// ---------- guided first monster: a step-by-step tutorial ----------
+// The monster waits while the coach box walks you through one question, the flipping cards and the last card.
+const TUT = { on: false, hold: false, step: null, timer: null };
+const TUT_STEPS = ['intro', 'face', 'cards', 'more', 'play'];
+const tap = () => (isTouch ? 'Tap' : 'Click');
+function tutorialWanted() { return G.night === 0 && G.inNight === 1 && safeGet('boowho-tutorial') !== 'done'; }
+function tutorialMonster() {       // a Ghost with no rot: one question leaves two cards, the next leaves one
+  const pool = FOLLOW.Ghost.filter((m) => levelOf(m, 'rot') === 0);
+  return pool.length ? pick(pool) : null;
+}
+// one coach box with an arrow that points at what to press
+function coach(html, target, buttons = [], opts = {}) {
+  const c = $('#coach');
+  $$('.coach-hi').forEach((e) => e.classList.remove('coach-hi'));
+  clearTimeout(TUT.fade);
+  if (!html) { c.classList.remove('show'); TUT.fade = setTimeout(() => { c.hidden = true; }, 200); return; }
+  const dots = TUT_STEPS.includes(TUT.step) ? `<span class="coach-dots">${TUT_STEPS.map((st) => `<i class="${st === TUT.step ? 'on' : TUT_STEPS.indexOf(st) < TUT_STEPS.indexOf(TUT.step) ? 'done' : ''}"></i>`).join('')}</span>` : '';
+  c.innerHTML = `${dots}<p>${html}</p><div class="coach-row">${buttons.map(([id, label, main]) => `<button type="button" class="btn small${main ? '' : ' ghost'}" data-coach="${id}">${label}</button>`).join('')}</div><span class="coach-arrow"></span>`;
+  c.querySelectorAll('[data-coach]').forEach((b) => b.addEventListener('click', () => { Sound.click(); tutorialButton(b.dataset.coach); }));
+  const els = target ? $$(target) : [];
+  els.forEach((e) => e.classList.add('coach-hi'));
+  c.hidden = false; c.style.top = ''; c.style.bottom = '';
+  const r = els.length ? els.map((e) => e.getBoundingClientRect()).reduce((a, b) => ({ left: Math.min(a.left, b.left), right: Math.max(a.right, b.right), top: Math.min(a.top, b.top), bottom: Math.max(a.bottom, b.bottom) })) : null;
+  const below = r && r.bottom < innerHeight * 0.3;              // the target is at the top of the screen: sit under it
+  if (below) c.style.top = `${Math.round(r.bottom + 16)}px`;
+  else c.style.bottom = `${Math.round(innerHeight - $('#dock').getBoundingClientRect().top + 16)}px`;
+  c.classList.toggle('below', !!below); c.classList.toggle('no-arrow', !r || !!opts.noArrow);
+  if (r) {                                                      // point the arrow at the middle of the target
+    const box = c.getBoundingClientRect(), x = (r.left + r.right) / 2 - box.left;
+    c.style.setProperty('--arrow-x', `${Math.max(18, Math.min(box.width - 18, x))}px`);
+  }
+  requestAnimationFrame(() => c.classList.add('show'));
+}
+const SKIP = ['skip', 'Skip'];
+function tutorialStep(step) {
+  TUT.step = step; $('#coach').classList.remove('show');
+  const up = upCards(), name = (c) => `<b>${WEAPONS[c].name}</b>`;
+  if (step === 'intro') coach('A monster is coming! Find out what it is before it reaches the gate.', '#distance', [['next', 'OK', true], SKIP]);
+  if (step === 'face') coach(`${tap()} <b>Face</b> to look at its face.`, '.chip[data-q="rot"]', [SKIP]);
+  if (step === 'cards') coach(`Its face has <b>no rot</b>, so the cards that can't have that flipped over. ${up.length === 2 ? `Only ${name(up[0])} and ${name(up[1])} are left.` : ''}`, up.map((c) => `#card-${c}`).join(','), [['next', 'OK', true], SKIP]);
+  if (step === 'more') coach(`Ask one more question to tell them apart. ${tap()} any part.`, '.chip:not(.found)', [SKIP]);
+  if (step === 'play') coach(`Only ${name(up[0])} fits. ${tap()} it!`, `#card-${up[0]}`, []);
+}
+function startTutorial() {
+  Object.assign(TUT, { on: true, hold: false }); G.tipShown = true;
+  G.progress = 0.3; G.lead = 0; placeOnPath(stranger.group, G.progress); updateDistance();
+  setTimeout(() => { if (TUT.on && TUT.step === null) tutorialStep('intro'); }, 700);
+}
+function tutorialButton(id) {
+  if (id === 'next') tutorialStep(TUT.step === 'intro' ? 'face' : 'more');
+  if (id === 'skip') endTutorial(false);
+  if (id === 'go') { TUT.hold = false; coach(null); }
+}
+function tutorialAsking() { if (TUT.on) coach(null); if (TUT.hold) { TUT.hold = false; coach(null); } }   // keep the view clear while the spyglass looks
+function tutorialAnswer() {
+  if (!TUT.on) return;
+  clearTimeout(TUT.timer);
+  TUT.timer = setTimeout(() => {                               // let the cards finish flipping first
+    if (!TUT.on) return;
+    if (upCards().length === 1) return tutorialStep('play');
+    if (TUT.step === 'face') return tutorialStep('cards');
+    tutorialStep('more');
+  }, 900);
+}
+function endTutorial(finished) {
+  TUT.on = false; TUT.step = null; safeSet('boowho-tutorial', 'done'); clearTimeout(TUT.timer);
+  coach(null);
+  TUT.hold = finished;             // the next monster waits until you press Start
+}
+function tutorialNextMonster() {
+  if (!TUT.hold) return;
+  setTimeout(() => {
+    if (!TUT.hold || G.state !== 'play') return;
+    coach('<b>You stopped it!</b> From now on monsters keep walking, so be quick. Fewer questions give more points.', null, [['go', 'Start', true]]);
+  }, 500);
 }
 
 // ---------- input ----------
@@ -809,10 +926,13 @@ function bind() {
   $('#journalBtn').addEventListener('click', () => { cameraMode = 'journal'; openJournalPage(focusIndex); show('journal'); });
   $$('.back-title').forEach((b) => b.addEventListener('click', goTitle));
   $('#howPlay').addEventListener('click', () => { Sound.init(); Sound.startAmbience(); newGame(); });
+  $('#howTutorial').addEventListener('click', () => { safeSet('boowho-tutorial', ''); Sound.init(); Sound.startAmbience(); newGame(); });
   $('#introGo').addEventListener('click', startNight);
   $('#shopGo').addEventListener('click', showNightIntro);
   $('#againBtn').addEventListener('click', newGame);
   $('#askOracle').addEventListener('click', askOracle);
+  $('#rulesBtn').addEventListener('click', () => { setRules(!$('#hud').classList.contains('show-rules')); Sound.click(); });
+  setRules(safeGet('boowho-rules') === '1');
   $('#pauseBtn').addEventListener('click', togglePause);
   $('#resumeBtn').addEventListener('click', togglePause);
   $('#quitBtn').addEventListener('click', () => { G.paused = false; goTitle(); });
@@ -848,6 +968,7 @@ function togglePause() {
   if (G.paused) { show('pause'); Sound.stopMusic(); } else { hideScreens(); if (!G.resolveMode) Sound.startMusic(); }
 }
 function goTitle() {
+  Object.assign(TUT, { on: false, hold: false, step: null }); coach(null);
   Sound.stopMusic(); G.state = 'title'; G.paused = false; cameraMode = 'title'; world.setMood('normal');
   stranger.group.visible = false; if (G.actor) G.actor.group.visible = false; G.actor = null; G.resolveMode = null;
   showcase.forEach((a) => { a.group.visible = true; });
@@ -921,8 +1042,8 @@ function frame() {
   const resolving = !!G.resolveMode; if (resolving !== hudEl.classList.contains('resolving')) hudEl.classList.toggle('resolving', resolving);
   if (G.state === 'play' && !G.paused) {
     if (!G.resolveMode) {
-      const rate = 1 / walkSeconds();
-      if (G.lead > 0) G.lead -= dt; else G.progress += dt * rate;                  // a short pause before it starts walking
+      const rate = speedMul() / walkSeconds();
+      if (TUT.on || TUT.hold) { /* the tutorial monster waits for you */ } else if (G.lead > 0) G.lead -= dt; else G.progress += dt * rate;                  // a short pause before it starts walking
       placeOnPath(stranger.group, Math.min(1, G.progress)); stranger.animate(t, dt, false);
       updateDistance();
       audio.step -= dt; audio.beat -= dt;
@@ -1016,5 +1137,6 @@ lantern.ray.layers.enable(1);
 bind(); goTitle(); setCameraTargets(0); cam.pos.copy(cam.wantPos); cam.look.copy(cam.wantLook);
 $('#loading').hidden = true;
 window.__nightWatchReady = true;
-window.__nightWatch = { G, timeScale: 1, nextMonster, camera, renderer, figRT, sharpRT, blurB, figPass, SHARP, scene, showcase, actors, THREE, cam, world, lantern, get stranger() { return stranger; }, walkers, ask, answer, levelOf, RULES, isTrick, upCards, setCameraMode: (m) => { cameraMode = m; } };   // handle for testing
+Brain.init();                 // load ONNX Runtime Web in the background; the JavaScript engine works until then
+window.__nightWatch = { G, Brain, askOracle, choose, TUT, timeScale: 1, nextMonster, camera, renderer, figRT, sharpRT, blurB, figPass, SHARP, scene, showcase, actors, THREE, cam, world, lantern, get stranger() { return stranger; }, walkers, ask, answer, levelOf, RULES, isTrick, upCards, setCameraMode: (m) => { cameraMode = m; } };   // handle for testing
 requestAnimationFrame(frame);

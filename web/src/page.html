@@ -78,7 +78,8 @@
   .weapon-table { display: grid; grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); gap: 0.35rem 1rem; margin-top: 0.4rem; font-size: 0.95rem; }
   .weapon-table div { white-space: nowrap; }
   .weapon-table span { color: var(--parchment-dim); }
-  .how-extra { margin-top: 1rem; color: var(--parchment-dim); font-size: 0.95rem; }
+  .how-list { margin: 1.1rem 0 0; padding-left: 1.1rem; display: grid; gap: 0.3rem; color: #d5ccb8; font-size: 0.95rem; }
+  .how-list li::marker { color: var(--amber); }
 
   /* journal */
   #journal { justify-content: flex-end; align-items: stretch; }
@@ -87,6 +88,7 @@
   .jtab { border: 1px solid var(--panel-edge); background: transparent; padding: 0.3rem 0.7rem; border-radius: 3px; cursor: pointer; color: var(--parchment-dim); }
   .jtab[aria-selected="true"] { background: var(--blood); color: #f1e7d6; border-color: #b8372f; font-weight: 700; }
   .lore { margin-top: 0.6rem; color: #ddd3b6; }
+  .lore b { color: var(--amber); font-weight: 700; }
   .weapon-line { margin-top: 0.9rem; display: flex; align-items: center; gap: 0.4rem; }
   .weapon-line img { width: 34px; height: 34px; object-fit: contain; }
   .jstats, .jcolors { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.45rem; font-size: 0.93rem; }
@@ -168,26 +170,29 @@
   @keyframes rise { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
   #clues { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
   #clues li { display: grid; }
-  .chip { appearance: none; font: inherit; color: inherit; text-align: left; cursor: pointer; display: grid; padding: 0.35rem 0.6rem; border-radius: 4px; background: rgba(5, 6, 8, 0.8); border: 1px solid rgba(200, 146, 63, 0.35); min-width: 0; transition: border-color .15s, background .15s; }
+  .chip { appearance: none; font: inherit; color: inherit; text-align: center; cursor: pointer; display: grid; padding: 0.35rem 0.6rem; border-radius: 4px; background: rgba(5, 6, 8, 0.8); border: 1px solid rgba(200, 146, 63, 0.35); min-width: 0; transition: border-color .15s, background .15s; }
   .chip:hover:not(:disabled) { border-color: var(--amber); background: rgba(40, 26, 8, 0.85); }
   .chip:disabled { cursor: default; }
+  .chip.locked { opacity: .45; }
   .chip.asking { border-color: var(--amber); animation: blink 0.5s steps(2) infinite; }
   .chip-label { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--parchment-dim); }
   .chip-value { font-size: 0.85rem; color: rgba(217, 209, 193, 0.55); font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chip.found { border-color: rgba(200, 146, 63, 0.6); animation: reveal .8s ease-out; }
   .chip.found .chip-value { color: #ffe2a8; font-style: normal; font-weight: 700; }
   @keyframes reveal { from { background: rgba(200, 146, 63, 0.4); } to { background: rgba(5, 6, 8, 0.78); } }
-  #dockTop { display: grid; grid-template-columns: 1fr 10.5rem; gap: 6px; align-items: stretch; }
+  #dockTop { display: grid; grid-template-columns: 7rem 1fr 7rem; gap: 6px; align-items: stretch; }
+  #rulesBtn[aria-pressed="true"] { border-color: var(--amber); color: #ffe2a8; background: rgba(40, 26, 8, 0.85); }
   #tools { display: grid; gap: 8px; align-content: stretch; }
   .tool { position: relative; overflow: hidden; display: grid; place-content: center; text-align: center; gap: 0.1rem; line-height: 1.15; }
   .tool { white-space: nowrap; }
+  .owl-short { display: none; }
   .tool small { font-weight: 400; font-size: 0.72rem; opacity: 0.8; }
   @keyframes blink { 50% { opacity: .45; } }
   #askOracle { border-color: var(--teal); background: linear-gradient(180deg, #86ecd9, var(--teal) 60%, #2c9e8a); color: #062822; box-shadow: 0 0 16px rgba(95, 224, 200, 0.3); }
 
   /* monster cards (Guess Who style): cards the clues rule out turn face down */
   #cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
-  .card { appearance: none; border: 0; padding: 0; background: none; cursor: pointer; perspective: 700px; aspect-ratio: 3 / 4.3; max-height: 27vh; width: 100%; justify-self: center; }
+  .card { appearance: none; border: 0; padding: 0; background: none; cursor: pointer; perspective: 700px; aspect-ratio: 3 / 4; max-height: 25vh; width: 100%; justify-self: center; }
   .card:disabled { cursor: default; }
   .card-inner { position: relative; display: block; width: 100%; height: 100%; transition: transform .6s cubic-bezier(.3,1.35,.5,1) var(--d, 0ms); transform-style: preserve-3d; }
   .card.flipped .card-inner { transition-delay: 0ms; }
@@ -197,16 +202,27 @@
   .card-face { background: #0d0c0b; }
   .card-back { transform: rotateY(180deg); align-content: center; gap: 0.25rem; background: radial-gradient(ellipse at center, #1c0f0c, #070404 75%); border-color: rgba(158, 31, 27, 0.55); }
   .card-back::before { content: ''; position: absolute; inset: 22% 18%; background: linear-gradient(45deg, transparent 47%, rgba(158,31,27,.55) 48% 52%, transparent 53%), linear-gradient(-45deg, transparent 47%, rgba(158,31,27,.55) 48% 52%, transparent 53%); }
-  .c-portrait { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; }
-  .c-info { position: relative; z-index: 1; width: 100%; display: grid; gap: 3px; padding: 1.6rem 6px 6px; background: linear-gradient(180deg, transparent, rgba(0,0,0,.88) 40%); }
+  .card-face { --c1: #3a2f22; }
+  .card[data-cls="Zombie"] .card-face { --c1: #4a5f26; } .card[data-cls="Witch"] .card-face { --c1: #4e2a68; } .card[data-cls="Ghost"] .card-face { --c1: #36507a; }
+  .card[data-cls="Vampire"] .card-face { --c1: #6a1616; } .card[data-cls="Mummy"] .card-face { --c1: #6a4e22; }
+  .card .card-face { background: radial-gradient(ellipse at 50% 38%, var(--c1), #0c0b0a 78%); }
+  .c-tool { position: absolute; left: 50%; top: 42%; height: 62%; width: auto; max-width: 84%; aspect-ratio: 1; transform: translate(-50%, -50%) rotate(-6deg); object-fit: contain; filter: drop-shadow(0 6px 8px rgba(0,0,0,.7)); transition: transform .25s; }
+  .card:hover:not(:disabled) .c-tool { transform: translate(-50%, -54%) rotate(-12deg) scale(1.06); }
+  .c-for { position: relative; z-index: 1; text-align: center; font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--parchment-dim); }
+  .c-info { position: relative; z-index: 1; width: 100%; box-sizing: border-box; overflow: hidden; display: grid; gap: 3px; padding: 1.2rem 6px 6px; background: linear-gradient(180deg, transparent, rgba(0,0,0,.88) 40%); }
   .c-rules { display: grid; gap: 2px; }
-  .rule-row { display: grid; grid-template-columns: 2.5em repeat(4, 1fr); gap: 2px; align-items: center; }
-  .rule-row i { font-style: normal; font-size: 0.52rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--parchment-dim); }
+  .card .c-for { display: none; }                         /* the monster's name only shows with the Rules button */
+  #hud.show-rules .card .c-for { display: block; }
+  .rule-row { display: none; grid-template-columns: 2.9em repeat(4, minmax(0, 1fr)); gap: 2px; align-items: center; padding: 0 2px; }
+  #hud.show-rules .rule-row, #hud[data-peek="rot"] .rule-row[data-q="rot"], #hud[data-peek="blood"] .rule-row[data-q="blood"],
+  #hud[data-peek="height"] .rule-row[data-q="height"], #hud[data-peek="color"] .rule-row[data-q="color"] { display: grid; }
+  .c-weapon, .c-key { display: none; }
+  .rule-row i { font-style: normal; font-size: 0.52rem; letter-spacing: 0.04em; overflow: hidden; text-overflow: clip; white-space: nowrap; text-transform: uppercase; color: var(--parchment-dim); }
   .rule-row b { display: block; height: 6px; border-radius: 1px; background: rgba(217, 209, 193, 0.13); transition: transform .2s; }
   .rule-row b.on { background: var(--glow, var(--amber)); }
   .rule-row[data-answer="0"] b[data-lv="0"], .rule-row[data-answer="1"] b[data-lv="1"], .rule-row[data-answer="2"] b[data-lv="2"], .rule-row[data-answer="3"] b[data-lv="3"] { outline: 1.5px solid #fff; outline-offset: 1px; transform: scaleY(1.5); }
   .card-face::after { content: ''; position: absolute; inset: 3px; border: 1px solid rgba(200, 146, 63, 0.45); border-radius: 4px; pointer-events: none; }
-  .c-name { position: relative; z-index: 1; text-align: center; font-family: var(--display); font-size: 1.1rem; padding: 0; letter-spacing: 0.04em; color: #f1e7d6; text-shadow: 0 1px 3px #000, 0 0 10px #000; }
+  .c-name { position: relative; z-index: 1; text-align: center; font-family: var(--display); font-size: 1.05rem; line-height: 1.05; padding: 0; letter-spacing: 0.04em; color: #f1e7d6; text-shadow: 0 1px 3px #000, 0 0 10px #000; }
   .c-weapon { position: absolute; z-index: 1; right: 6px; top: 6px; width: 26px; height: 26px; padding: 3px; border-radius: 50%; background: rgba(0,0,0,.55); border: 1px solid rgba(200,146,63,.5); object-fit: contain; }
   .c-key { position: absolute; z-index: 1; left: 7px; top: 5px; font-size: 0.72rem; color: var(--parchment-dim); font-variant-numeric: tabular-nums; }
   .c-back-name { position: relative; font-family: var(--display); font-size: 1.05rem; color: rgba(217, 209, 193, 0.5); }
@@ -272,21 +288,64 @@
     .banner strong { font-size: 1.25rem; }
     #dock { bottom: calc(8px + env(safe-area-inset-bottom, 0px)); gap: 6px; }
     #clues { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
-    .chip { padding: 0.2rem 0.4rem; } .chip-label { font-size: 0.6rem; } .chip-value { font-size: 0.76rem; }
-    #dockTop { grid-template-columns: 1fr 4.6rem; gap: 4px; }
+    .chip { padding: 0.2rem 0.15rem; } .chip-label { font-size: 0.6rem; } .chip-value { font-size: 0.76rem; }
+    #dockTop { grid-template-columns: 3.4rem 1fr 3.4rem; gap: 4px; }
     #cards { gap: 5px; }
-    .chip .ask { display: none; }
-    .title-bottom .row { gap: 0.5rem; flex-wrap: nowrap; } .title-bottom .btn { padding: 0.6rem 0.9rem; font-size: 0.92rem; white-space: nowrap; }
-    .tool { padding: 0.3rem 0.2rem; font-size: 0.8rem; } .tool small { font-size: 0.6rem; } .owl-long { display: none; }
+    .title-bottom .row { gap: 0.5rem; flex-wrap: wrap; } .title-bottom .btn { padding: 0.6rem 0.9rem; font-size: 0.92rem; white-space: nowrap; }
+    #dockTop .tool { padding: 0.25rem 0.1rem; font-size: 0.74rem; letter-spacing: 0; } .tool small { display: none; } .owl-long { display: none; } .owl-short { display: inline; }
     .score-pop { font-size: 2.4rem; }
     .card { max-height: 22vh; }
     .rule-row { grid-template-columns: repeat(4, 1fr); gap: 1px; } .rule-row i { display: none; } .rule-row b { height: 4px; } .c-info { padding: 1rem 3px 4px; gap: 2px; }
-    .c-name { font-size: 0.74rem; } .c-weapon { width: 18px; height: 18px; padding: 2px; } .c-key { display: none; } .c-back-name { font-size: 0.78rem; } .c-back-note { font-size: 0.55rem; }
+    .c-name { font-size: 0.7rem; } .c-for { font-size: 0.5rem; letter-spacing: 0.06em; } .c-tool { height: 60%; top: 38%; } .c-back-name { font-size: 0.78rem; } .c-back-note { font-size: 0.55rem; }
     .clue-pop { font-size: 1.1rem; }
     #journal { align-items: flex-end; }
     #journal .panel { max-height: 58%; max-width: none; }
     .panel { padding: 1.2rem 1.1rem; }
   }
+
+  /* the Owl's answer inside the banner */
+  .banner .mind { display: grid; gap: 0.2rem; margin: 0.35rem auto 0.1rem; width: min(19rem, 70vw); }
+  .banner .m-row { display: grid; grid-template-columns: 4.6rem 1fr 2.4rem; gap: 0.5rem; align-items: center; font-style: normal; text-align: left; }
+  .banner .m-row b { font-weight: 500; color: #e6fff9; font-size: 0.9rem; }
+  .banner .m-row em { font-style: normal; font-variant-numeric: tabular-nums; text-align: right; font-size: 0.85rem; }
+  .banner .m-bar { display: block; height: 0.5rem; background: rgba(95,224,200,.14); border-radius: 3px; overflow: hidden; }
+  .banner .m-bar i { display: block; height: 100%; background: var(--teal); border-radius: 3px; }
+  .banner .owl-line { color: #9fe3d6; font-size: 0.82rem; }
+
+  @media (max-width: 760px) {
+    .chip-q { display: none; }
+    .rule-row[data-answer] b[data-lv] { transform: none !important; outline-width: 1px !important; outline-offset: 0 !important; }
+  }
+  @media (max-height: 520px) { .rule-row[data-answer] b[data-lv] { transform: none !important; outline-width: 1px !important; outline-offset: 0 !important; } }
+  @media (max-width: 380px) { .chip-value { font-size: 0.68rem; } .chip-label { font-size: 0.55rem; } }
+  /* short screens (phones on their side): keep the cards readable */
+  @media (max-height: 520px) {
+    .c-for, #hud.show-rules .card .c-for { display: none; }
+    .rule-row { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; } .rule-row i { display: none; } .rule-row b { height: 3px; }
+    .c-info { padding: 0.5rem 3px 3px; gap: 1px; } .c-rules { gap: 1px; }
+    .c-tool { height: 56%; top: 36%; }
+  }
+  /* tutorial coach */
+  #coach { position: absolute; box-sizing: border-box; left: 50%; transform: translate(-50%, 6px); z-index: 16; width: min(23rem, calc(100% - 32px)); padding: 0.8rem 1rem 0.85rem;
+    background: rgba(4, 18, 16, 0.94); border: 1px solid rgba(95, 224, 200, 0.65); border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,.6), 0 0 22px rgba(95,224,200,.2); text-align: center;
+    opacity: 0; transition: opacity .2s ease, transform .25s ease; pointer-events: auto; }
+  #coach.show { opacity: 1; transform: translate(-50%, 0); }
+  #coach.below { transform: translate(-50%, -6px); } #coach.below.show { transform: translate(-50%, 0); }
+  #coach p { margin: 0; color: #e6fff9; font-size: 1.05rem; line-height: 1.4; text-wrap: balance; }
+  #coach p b { color: #ffffff; }
+  #coach .coach-dots { display: flex; justify-content: center; gap: 5px; margin-bottom: 0.45rem; }
+  #coach .coach-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(95,224,200,.22); transition: background .2s, transform .2s; }
+  #coach .coach-dots i.done { background: rgba(95,224,200,.6); } #coach .coach-dots i.on { background: var(--teal); transform: scale(1.3); }
+  #coach .coach-row { display: flex; justify-content: center; gap: 0.5rem; margin-top: 0.65rem; }
+  #coach .coach-row:empty { display: none; }
+  #coach .coach-row .ghost { border-color: transparent; color: var(--parchment-dim); }
+  .coach-arrow { position: absolute; left: var(--arrow-x, 50%); bottom: -9px; width: 16px; height: 16px; margin-left: -8px; transform: rotate(45deg);
+    background: rgba(4, 18, 16, 0.94); border-right: 1px solid rgba(95, 224, 200, 0.65); border-bottom: 1px solid rgba(95, 224, 200, 0.65); }
+  #coach.below .coach-arrow { bottom: auto; top: -9px; transform: rotate(225deg); }
+  #coach.no-arrow .coach-arrow { display: none; }
+  .coach-hi { outline: 2px solid var(--teal) !important; outline-offset: 3px; border-radius: 6px; animation: coachGlow 1.2s ease-in-out infinite; position: relative; z-index: 2; }
+  @keyframes coachGlow { 0%, 100% { box-shadow: 0 0 6px rgba(95,224,200,.4); } 50% { box-shadow: 0 0 22px rgba(95,224,200,.95); } }
+  @media (max-width: 760px) { #coach { padding: 0.7rem 0.85rem; } #coach p { font-size: 0.98rem; } }
   @media (prefers-reduced-motion: reduce) { .chip.found, .banner, #flash.on, .card.last .card-face, #owlMark { animation: none; } .card-inner, .btn { transition: none; } }
 </style>
 
@@ -311,13 +370,15 @@
     <div id="ring" hidden></div>
     <div id="dock">
       <div id="dockTop">
+        <button class="btn small tool" id="askOracle" type="button">Owl</button>
         <ul id="clues" aria-label="Questions"></ul>
-        <div id="tools"><button class="btn small tool" id="askOracle" type="button">Ask the Owl</button></div>
+        <button class="btn ghost small tool" id="rulesBtn" type="button" aria-pressed="false">Rules</button>
       </div>
       <nav id="cards" aria-label="Monster cards"></nav>
     </div>
   </div>
   <p id="banner" class="banner" hidden role="status"></p>
+  <div id="coach" hidden role="status" aria-live="polite"></div>
   <div id="lanternFx"></div>
   <div id="spyglass"></div>
   <div id="flash"></div>
@@ -342,21 +403,23 @@
   <section class="screen" id="howto" hidden>
     <div class="panel">
       <p class="eyebrow">How to play</p>
-      <h2>Hold the gate for 5 nights</h2>
+      <h2>Stop the monster</h2>
       <ol class="steps">
-        <li>A hooded stranger walks to your gate. You have 4 questions: its face (rot), hands (blood), shadow (size) and eyes (glow).</li>
-        <li>Click a body part, or a question button, to ask. The answer shows on every card.</li>
-        <li>Each card shows its monster's rules. Lit boxes are what that monster can have. Cards that do not match turn over.</li>
-        <li>Pick the card that is left (keys 1 to 5). Fewer questions, more points.
+        <li>Ask about its face, hands, shadow or eyes.</li>
+        <li>Cards that don't match flip over.</li>
+        <li>Play the last card left.
           <div class="weapon-table">
-            <div>Zombie <span>· shovel</span></div><div>Witch <span>· holy water</span></div><div>Ghost <span>· salt</span></div><div>Vampire <span>· garlic stake</span></div><div>Mummy <span>· fire torch</span></div>
+            <div>Shovel <span>· Zombie</span></div><div>Holy water <span>· Witch</span></div><div>Salt <span>· Ghost</span></div><div>Garlic stake <span>· Vampire</span></div><div>Fire torch <span>· Mummy</span></div>
           </div></li>
-        <li>Wrong, or too late: the gate loses 1 of its 5 lanterns. Lose all 5 and you lose.</li>
       </ol>
-      <p class="how-extra">Only the part you ask about comes into focus. On Halloween the last monster is the Monster King: triple points, but a wrong guess costs 2 lanterns.</p>
-      <p class="how-extra">Stuck? The Owl (key O) tells you the best question to ask. If two cards still fit at the end, it tells you which one is more common. From night 3, tricksters break one of their rules, and a wrong guess on one costs nothing.</p>
+      <ul class="how-list">
+        <li>Fewer questions, more points.</li>
+        <li>Wrong card: one more try. Miss again and you lose a lantern.</li>
+        <li>Stuck? Ask the Owl.</li>
+      </ul>
       <div class="row">
         <button class="btn" id="howPlay" type="button">Start</button>
+        <button class="btn ghost" id="howTutorial" type="button">Tutorial</button>
         <button class="btn ghost back-title" type="button">Back</button>
       </div>
     </div>
@@ -435,7 +498,7 @@
     }
   }, 15000);
 </script>
-<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/", "onnxruntime-web": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.wasm.min.mjs" } }</script>
 <script type="module">
 /*__MODULE__*/
 </script>
