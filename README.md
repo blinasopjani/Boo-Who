@@ -1,4 +1,4 @@
-# Boo Who? — AI-Powered 3D Horror Game
+# Boo Who? - AI-Powered 3D Horror Game
 
 **[Play it here!](https://blinasopjani.github.io/Boo-Who/)**
 
