@@ -8,7 +8,7 @@ Players must deduce the identity of procedurally generated monsters before they 
 
 ---
 
-## 🧠 Machine Learning & Data Science Core
+##  Machine Learning & Data Science Core
 
 This project is built from the ground up using a data-first approach, taking a raw dataset and transforming it into a fully playable web application.
 
@@ -26,7 +26,7 @@ The in-game helper, the Owl, is driven by a custom Neural Network trained to eva
 
 ---
 
-## 🎮 Game Features & Mechanics
+##  Game Features & Mechanics
 
 - **Dynamic Deductions:** Ask up to 4 questions per monster (rot, blood, size, glow color). Every question yields a clue but makes the monster walk 10% faster.
 - **Compete with the AI:** The Owl AI evaluates the exact same evidence you do. The end-screen tracks your accuracy vs. the neural network.
@@ -35,7 +35,7 @@ The in-game helper, the Owl, is driven by a custom Neural Network trained to eva
 
 ---
 
-## 📊 Analytics & Visualizations
+##  Analytics & Visualizations
 
 | One masked network matches 16 models | Smart questioning out-performs random | Feature importance via Shapley |
 | :---: | :---: | :---: |
@@ -43,7 +43,7 @@ The in-game helper, the Owl, is driven by a custom Neural Network trained to eva
 
 ---
 
-## 📁 Repository Structure
+##  Repository Structure
 
 | Path | Description |
 | --- | --- |
@@ -62,7 +62,7 @@ The in-game helper, the Owl, is driven by a custom Neural Network trained to eva
 
 ---
 
-## 🚀 Setup & Execution
+##  Setup & Execution
 
 To explore the data science workflow:
 ```bash
@@ -76,7 +76,7 @@ To build the game after making changes to `web/src/`:
 python web/build.py
 ```
 
-## 🛠️ Built With
+##  Built With
 - **AI & Data Science:** Python, Pandas, Scikit-Learn, LightGBM, Matplotlib, ONNX, ONNX Runtime Web
 - **Frontend & 3D:** JavaScript, Three.js, HTML/CSS
 - **Assets:** 3D models by [Quaternius](https://quaternius.com) (CC0)
