@@ -9,7 +9,6 @@ const MONSTERS = MONSTER_ROWS.map((r) => ({
   cls: CLASSES[r[0]], height: r[1], rottingFleshPct: r[2], bloodCoverage: r[3], aura: r[4], hairLength: r[5],
   color: COLOR_NAMES[r[6]], trickster: r[7] === 1,
 }));
-const TRICK_POOL = MONSTERS.filter((m) => m.trickster);
 
 const WEAPONS = {
   Zombie: { name: 'Shovel', color: '#c9a24a' },
@@ -21,40 +20,45 @@ const WEAPONS = {
 const PLURAL = { Zombie: 'Zombies', Witch: 'Witches', Ghost: 'Ghosts', Vampire: 'Vampires', Mummy: 'Mummies' };
 
 const NIGHTS = [
-  { name: 'First Moon', count: 5, walk: 34, trick: 0, mood: 'normal', note: '5 slow monsters. Learn the lantern.' },
-  { name: 'Night of Crows', count: 6, walk: 30, trick: 0, mood: 'normal', note: '6 monsters, walking faster.' },
-  { name: 'Fog Night', count: 7, walk: 27, trick: 0.12, mood: 'fog', note: 'Thick fog. Tricksters appear: their clues point to the wrong card, but a wrong guess on one costs nothing.' },
-  { name: 'Blood Moon', count: 8, walk: 24, trick: 0.18, mood: 'blood', note: 'A red moon and more tricksters.' },
-  { name: 'Halloween', count: 9, walk: 21, trick: 0.25, mood: 'halloween', note: 'The last night. Survive it to win.' },
+  { name: 'First Moon', count: 5, walk: 36, trick: 0, mood: 'normal', note: '5 slow monsters. Ask about the face, hands, shadow and eyes.' },
+  { name: 'Night of Crows', count: 6, walk: 32, trick: 0, mood: 'normal', note: '6 monsters, walking faster.' },
+  { name: 'Fog Night', count: 7, walk: 29, trick: 0.1, mood: 'fog', note: 'Tricksters appear: they break one of their own rules. A wrong guess on one costs nothing.' },
+  { name: 'Blood Moon', count: 8, walk: 26, trick: 0.15, mood: 'blood', note: 'A red moon and more tricksters.' },
+  { name: 'Halloween', count: 9, walk: 23, trick: 0.2, mood: 'halloween', note: 'The last night. Survive it to win.' },
 ];
-const PATH_METERS = 80;
+const PATH_METERS = 50;
 const MAX_HEARTS = 5;
-const OIL_START = 100, OIL_BURN = 1.2, OIL_DAWN_MIN = 50;
 const HINT_COST = 5;
-const DWELL = 1.0, AURA_DWELL = 1.2;                              // seconds of light (or dark) to find a clue
-const CLUE_ORDER = OWL_ANY.clue_order;                           // hair, aura, color, height, rot, blood
-const FLIP_THRESHOLD = OWL_ANY.flip_threshold;
+const ASK_TIME = 0.7;                                             // seconds the lantern takes to look at a body part
 
-// what each clue is called, where the lantern finds it, and the words used for its value
-const CLUE_INFO = {
-  hair: { label: 'Hair', where: 'head', field: 'hairLength', fmt: (v) => v.toFixed(1), words: ['cropped', 'short', 'shoulder-length', 'long', 'waist-long'] },
-  aura: { label: 'Aura', where: 'lantern off', field: 'aura', fmt: (v) => v.toFixed(2), words: ['no glow', 'dim', 'glowing', 'bright', 'blinding'] },
-  color: { label: 'Glow', where: 'eyes', field: 'color' },
-  height: { label: 'Height', where: 'shadow', field: 'height', fmt: (v) => v.toFixed(0), words: ['child-sized', 'short', 'average', 'tall', 'towering'] },
-  rot: { label: 'Rot', where: 'face', field: 'rottingFleshPct', fmt: (v) => `${Math.round(v)}%`, words: ['no rot', 'patches of rot', 'half rotten', 'mostly rotten', 'falling apart'] },
-  blood: { label: 'Blood', where: 'hands', field: 'bloodCoverage', fmt: (v) => `${Math.round(v)}%`, words: ['spotless', 'spattered', 'bloodstained', 'soaked', 'drenched'] },
+// ---------- the four questions and each monster's rules (from notebooks/04_monster_rules.ipynb) ----------
+const QUESTIONS = TELLS.questions;                                // rot, blood, height, color
+const Q = {
+  rot: { label: 'Rot', where: 'face', ask: 'Look at its face', field: 'rottingFleshPct' },
+  blood: { label: 'Blood', where: 'hands', ask: 'Look at its hands', field: 'bloodCoverage' },
+  height: { label: 'Size', where: 'shadow', ask: 'Look at its shadow', field: 'height' },
+  color: { label: 'Glow', where: 'eyes', ask: 'Look into its eyes', field: 'color' },
 };
-const OWL_WHISPER = { hair: 'Look at its head', color: 'Look into its eyes', rot: 'Look at its face', blood: 'Look at its hands', height: 'Look at its shadow', aura: 'Put out the lantern' };
-const SORTED = {};
-for (const k of Object.keys(CLUE_INFO)) if (k !== 'color') SORTED[k] = MONSTERS.map((m) => m[CLUE_INFO[k].field]).sort((a, b) => a - b);
+const RULES = TELLS.rules;
+function levelOf(m, q) {
+  if (q === 'color') return TELLS.colors.indexOf(m.color);
+  const v = m[Q[q].field], cs = TELLS.cuts[q]; let i = 0;
+  while (i < cs.length && v >= cs[i]) i++;
+  return i;
+}
+function levelWord(q, lv) { return TELLS.levels[q][lv]; }
+function fits(cls, m, q) { return RULES[cls][q].includes(levelOf(m, q)); }
+function brokenRules(m) { return QUESTIONS.filter((q) => !fits(m.cls, m, q)); }
+// honest monsters follow every rule of their kind; tricksters break exactly one
+const FOLLOW = Object.fromEntries(CLASSES.map((c) => [c, MONSTERS.filter((m) => m.cls === c && brokenRules(m).length === 0)]));
+const TRICKS = MONSTERS.filter((m) => brokenRules(m).length === 1);
+const CLASS_WEIGHT = { Zombie: 0.28, Witch: 0.18, Ghost: 0.18, Vampire: 0.18, Mummy: 0.18 };
+const isTrick = (m) => brokenRules(m).length > 0;
+
+// percentiles, for how strongly the hooded figure shows a clue and for the journal
+const FIELDS = { rot: 'rottingFleshPct', blood: 'bloodCoverage', height: 'height', hair: 'hairLength', aura: 'aura' };
+const SORTED = Object.fromEntries(Object.entries(FIELDS).map(([k, f]) => [k, MONSTERS.map((m) => m[f]).sort((a, b) => a - b)]));
 function percentile(k, v) { const a = SORTED[k]; let lo = 0, hi = a.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (a[mid] < v) lo = mid + 1; else hi = mid; } return lo / a.length; }
-function clueWord(k, v) { return CLUE_INFO[k].words[Math.min(4, Math.floor(percentile(k, v) * 5))]; }
-// monsters whose clues clearly point to what they are (checked with all 6 clues by the model).
-// Early nights only use the clearest ones, so the cards are easy to read while you learn.
-const trueOdds = (m) => consultMask(ORACLE_MODEL, OWL_ANY, m, 63)[CLASSES.indexOf(m.cls)];
-const NORMAL = MONSTERS.filter((m) => !m.trickster).map((m) => ({ m, p: trueOdds(m) }));
-const CLEAR_POOL = NORMAL.filter((x) => x.p >= 0.9).map((x) => x.m);
-const NORMAL_POOL = NORMAL.filter((x) => x.p >= 0.75).map((x) => x.m);
 
 // ---------- DOM helpers ----------
 const $ = (s) => document.querySelector(s);
@@ -166,6 +170,51 @@ Object.assign(Sound, {
     bp.frequency.exponentialRampToValueAtTime(250, t + 0.7); this.env(g, t, 0.05, 0.25, 0.7); n.connect(bp).connect(g).connect(this.master); n.start(t); n.stop(t + 0.9);
   },
   flip() { this.tone(180, 0.12, 'triangle', 0.05, -60); },
+  correct() {                                                       // right monster: a bright rising bell chord and a shimmer
+    if (!this.ready()) return;
+    [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => setTimeout(() => { this.tone(f, 0.9, 'triangle', 0.07); this.tone(f * 2, 0.5, 'sine', 0.02); }, i * 85));
+    const t = this.ctx.currentTime + 0.3, n = this.noiseSrc(), hp = this.filter('highpass', 6000, 0.7), g = this.ctx.createGain();
+    this.env(g, t, 0.05, 0.05, 1.1); n.connect(hp).connect(g).connect(this.master); n.start(t); n.stop(t + 1.3);
+  },
+  wrong() {                                                         // wrong monster: a sour falling buzz and a low thud
+    if (!this.ready()) return;
+    const t = this.ctx.currentTime, lp = this.filter('lowpass', 1400, 1.2), g = this.ctx.createGain();
+    this.env(g, t, 0.02, 0.16, 0.9); lp.connect(g).connect(this.master);
+    [[233, 110], [247, 116], [311, 147]].forEach(([a, b]) => { const o = this.osc('sawtooth', a); o.frequency.exponentialRampToValueAtTime(b, t + 0.85); o.connect(lp); o.start(t); o.stop(t + 1); });
+    this.tone(70, 0.6, 'square', 0.06, -30);
+  },
+  thunder() {                                                       // distant thunder after a lightning flash
+    if (!this.ready()) return;
+    const t = this.ctx.currentTime + 0.4, n = this.noiseSrc(), lp = this.filter('lowpass', 180, 0.8), g = this.ctx.createGain();
+    lp.frequency.exponentialRampToValueAtTime(60, t + 2.4); this.env(g, t, 0.25, 0.3, 2.3); n.connect(lp).connect(g).connect(this.master); n.start(t, Math.random()); n.stop(t + 2.8);
+  },
+  // a slow pulse that speeds up as the monster comes closer: bass thump, a tolling bell, then a ticking beat
+  intensity: 0, musicOn: false, musicTimer: null, musicStep: 0,
+  startMusic() {
+    if (!this.ready() || this.musicOn) return;
+    this.musicOn = true; this.musicStep = 0;
+    const BELL = [220, 207.65, 246.94, 196, 233.08, 185];            // a falling, uneasy minor line
+    const tick = () => {
+      if (!this.musicOn) return;
+      const k = Math.max(0, Math.min(1, this.intensity)), s = this.musicStep++;
+      const t = this.ctx.currentTime;
+      if (s % 2 === 0) {                                             // bass thump on the beat
+        const o = this.osc('sine', 62), g = this.ctx.createGain(); o.frequency.exponentialRampToValueAtTime(38, t + 0.18);
+        this.env(g, t, 0.005, 0.07 + 0.12 * k, 0.22); o.connect(g).connect(this.master); o.start(t); o.stop(t + 0.3);
+      }
+      if (s % 8 === 0) this.tone(BELL[(s / 8) % BELL.length], 1.6, 'triangle', 0.028 + 0.02 * k);
+      if (k > 0.45 && s % 2 === 1) {                                 // ticking hats once it is half way
+        const n = this.noiseSrc(), hp = this.filter('highpass', 7000, 0.8), g = this.ctx.createGain();
+        this.env(g, t, 0.002, 0.02 + 0.03 * k, 0.05); n.connect(hp).connect(g).connect(this.master); n.start(t, Math.random()); n.stop(t + 0.08);
+      }
+      if (k > 0.75 && s % 4 === 2) this.tone(BELL[(s / 4) % BELL.length] * 2, 0.25, 'sawtooth', 0.012 + 0.02 * k);
+      const bpm = 58 + 104 * k;
+      this.musicTimer = setTimeout(tick, 60000 / bpm / 2);
+    };
+    tick();
+  },
+  stopMusic() { this.musicOn = false; clearTimeout(this.musicTimer); },
+  question() { this.tone(330, 0.18, 'sine', 0.05, 120); },
   found() { this.tone(523, 0.4, 'triangle', 0.05); this.tone(784, 0.5, 'sine', 0.03); },
   lantern(on) { this.tone(on ? 700 : 300, 0.12, 'triangle', 0.04, on ? 300 : -150); },
 });
@@ -177,7 +226,7 @@ const canvasHost = $('#scene');
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.45;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.7;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 canvasHost.appendChild(renderer.domElement);
 
@@ -191,9 +240,46 @@ scene.add(camera);
 const world = buildWorld(scene);
 const sparkles = makeSparkles(scene);
 
+// a ring of light that swells on the body part you just asked about
+const pulses = [];
+for (let i = 0; i < 4; i++) {
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOW, color: '#ffc46b', transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, fog: false }));
+  sp.renderOrder = 5; scene.add(sp); pulses.push({ sp, t: 9 });
+}
+function pulseAt(zone, color) {
+  const p = pulses.find((x) => x.t > 0.8) || pulses[0];
+  stranger.zonePosition(zone, p.sp.position); p.sp.material.color.set(color); p.t = 0;
+}
+function updatePulses(dt) {
+  for (const p of pulses) {
+    if (p.t > 0.8) { p.sp.material.opacity = 0; continue; }
+    p.t += dt; const k = p.t / 0.8;
+    p.sp.scale.setScalar(0.3 + 1.6 * k); p.sp.material.opacity = 0.9 * (1 - k) * (1 - k);
+  }
+}
+// fireflies drifting in the air in front of the watcher
+const FLY_N = 70, flyGeo = new THREE.BufferGeometry(), flyPos = new Float32Array(FLY_N * 3), flySeed = [];
+for (let i = 0; i < FLY_N; i++) flySeed.push([Math.random() * 20 - 10, Math.random() * 3 + 0.4, Math.random() * 16 + 2, Math.random() * 6.28, 0.3 + Math.random() * 0.6]);
+flyGeo.setAttribute('position', new THREE.BufferAttribute(flyPos, 3));
+const flyMat = new THREE.PointsMaterial({ size: 0.16, map: GLOW, color: '#d6ff7a', transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+const flies = new THREE.Points(flyGeo, flyMat); flies.frustumCulled = false; scene.add(flies);
+const flyFwd = new THREE.Vector3(), flyRight = new THREE.Vector3(), flyUp = new THREE.Vector3(0, 1, 0);
+function updateFlies(t) {
+  camera.getWorldDirection(flyFwd); flyFwd.y = 0; flyFwd.normalize(); flyRight.crossVectors(flyFwd, flyUp);
+  for (let i = 0; i < FLY_N; i++) {
+    const [x, y, z, ph, sp] = flySeed[i];
+    const px = x + Math.sin(t * sp + ph) * 0.8, py = y + Math.sin(t * sp * 1.3 + ph * 2) * 0.35, pz = z + Math.cos(t * sp * 0.7 + ph) * 0.8;
+    flyPos[i * 3] = camera.position.x + flyRight.x * px + flyFwd.x * pz;
+    flyPos[i * 3 + 1] = Math.max(0.3, camera.position.y - 2.2 + py);
+    flyPos[i * 3 + 2] = camera.position.z + flyRight.z * px + flyFwd.z * pz;
+  }
+  flyGeo.attributes.position.needsUpdate = true;
+  flyMat.opacity = 0.55 + 0.35 * Math.sin(t * 3.1);
+}
+
 // film look: cold, drained colours, grain, vignette and a faint projector flicker
 const FilmShader = {
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uGrain: { value: 0.07 }, uFlicker: { value: 1 }, uDesat: { value: 0.5 }, uVignette: { value: 1.15 }, uRes: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uGrain: { value: 0.07 }, uFlicker: { value: 1 }, uDesat: { value: 0.38 }, uVignette: { value: 0.95 }, uRes: { value: new THREE.Vector2(1, 1) } },
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
     uniform sampler2D tDiffuse; uniform float uTime, uGrain, uFlicker, uDesat, uVignette; uniform vec2 uRes; varying vec2 vUv;
@@ -212,6 +298,36 @@ const FilmShader = {
 };
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
+// The disguised monster lives in its own layer (1). It is drawn alone, blurred, and laid over the scene;
+// then only the parts you have uncovered are drawn again, sharp, on top.
+const QUAD_VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+const figRT = new THREE.WebGLRenderTarget(1, 1), sharpRT = new THREE.WebGLRenderTarget(1, 1);
+const blurA = new THREE.WebGLRenderTarget(1, 1), blurB = new THREE.WebGLRenderTarget(1, 1);
+const blurPass = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uDir: { value: new THREE.Vector2(1, 0) } }, vertexShader: QUAD_VS,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uDir; varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv) * 0.19648;
+      c += (texture2D(tDiffuse, vUv + uDir * 1.41176) + texture2D(tDiffuse, vUv - uDir * 1.41176)) * 0.29691;
+      c += (texture2D(tDiffuse, vUv + uDir * 3.29412) + texture2D(tDiffuse, vUv - uDir * 3.29412)) * 0.09447;
+      c += (texture2D(tDiffuse, vUv + uDir * 5.17647) + texture2D(tDiffuse, vUv - uDir * 5.17647)) * 0.01038;
+      gl_FragColor = c;
+    }`,
+});
+const figPass = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, tFig: { value: blurB.texture }, tSharp: { value: sharpRT.texture }, uOn: { value: 0 } }, vertexShader: QUAD_VS,
+  fragmentShader: `uniform sampler2D tDiffuse, tFig, tSharp; uniform float uOn; varying vec2 vUv;
+    void main() {
+      vec4 s = texture2D(tDiffuse, vUv);
+      if (uOn < 0.5) { gl_FragColor = s; return; }
+      vec4 f = texture2D(tFig, vUv), k = texture2D(tSharp, vUv);
+      vec3 c = s.rgb * (1.0 - f.a) + f.rgb;
+      c = c * (1.0 - k.a) + k.rgb;
+      gl_FragColor = vec4(c, 1.0);
+    }`,
+});
+figPass.uniforms.tFig.value = blurB.texture; figPass.uniforms.tSharp.value = sharpRT.texture;   // ShaderPass does not copy render target textures
+composer.addPass(figPass);
 const filmPass = new ShaderPass(FilmShader); composer.addPass(filmPass);
 composer.addPass(new OutputPass());
 
@@ -251,13 +367,19 @@ const showcase = CLASSES.map((c, i) => {
   const a = makeCharacter(c); a.group.position.set(SHOW_X[i], 0, -9.5 - Math.abs(i - 2) * 0.55);
   a.group.lookAt(SHOW_X[i] * 0.6, 0, -40); scene.add(a.group); return a;
 });
-const stranger = makeStranger(); stranger.group.visible = false; scene.add(stranger.group);
-const owl = makeOwl(); owl.group.position.set(0, 6.3, 0.05); scene.add(owl.group);
+// one disguised real monster per kind; the one walking is `stranger`
+const walkers = Object.fromEntries(CLASSES.map((c) => { const w = makeDisguised(c); w.group.visible = false; scene.add(w.group); return [c, w]; }));
+let stranger = walkers.Zombie;
+const owl = makeOwl(); owl.group.position.set(-2.15, 3.63, 0.42); owl.group.userData.baseY = 3.63; owl.group.scale.setScalar(0.62); scene.add(owl.group);
+const owlLight = new THREE.PointLight('#a9bde0', 3, 4, 1.5); owlLight.position.set(-2.0, 4.3, 1.8); scene.add(owlLight);   // on the left gate post, beside the lantern
 
 
 function resize() {
   const w = canvasHost.clientWidth, h = canvasHost.clientHeight;
   renderer.setSize(w, h, false); composer.setSize(w, h); camera.aspect = w / h;
+  const db = renderer.getDrawingBufferSize(new THREE.Vector2());
+  sharpRT.setSize(db.x, db.y); figRT.setSize(Math.ceil(db.x / 2), Math.ceil(db.y / 2));
+  blurA.setSize(Math.ceil(db.x / 2), Math.ceil(db.y / 2)); blurB.setSize(Math.ceil(db.x / 2), Math.ceil(db.y / 2));
   filmPass.uniforms.uRes.value.set(w, h);
   camera.updateProjectionMatrix();
 }
@@ -279,15 +401,23 @@ function setCameraTargets(t) {
   } else if (cameraMode === 'debug') {
     /* free camera for testing: cam.wantPos and cam.wantLook are set from the console */
   } else if (cameraMode === 'scare') {
-    cam.wantPos.set(0, 2.5, 3.2); cam.wantLook.set(0, 2.2, -3); cam.wantFov = narrow ? 70 : 52;
+    cam.wantPos.set(0, 2.3, 3.4); cam.wantLook.set(0, narrow ? 1.0 : 1.25, -3); cam.wantFov = narrow ? 66 : 50;
   } else if (G.state === 'play' && stranger.group.visible) {
-    // watch the stranger from a few steps ahead of it on the path, so trees never block the view
-    const len = PATH.getLength(), back = (narrow ? 9.5 : 8.5) / len;
-    const uc = Math.max(0.015, G.u - back), cp = PATH.getPointAt(uc);
+    // you watch from behind your gate; asking a question zooms the spyglass onto that body part
     const s = stranger.group.position;
-    cam.wantPos.set(cp.x, pathLift(uc) + 2.4, cp.z);
-    cam.wantLook.set(s.x, s.y + (narrow ? 0.9 : 1.45), s.z);
-    cam.wantFov = narrow ? 36 : 36;
+    cam.wantPos.set(0, narrow ? 3.4 : 3.6, narrow ? 13 : 11);
+    if (G.lookZone) {
+      const whole = G.lookZone === 'height', zone = whole ? 'chest' : G.lookZone;
+      stranger.zonePosition(zone, vTmp); cam.wantLook.copy(vTmp);
+      if (whole) cam.wantLook.y = s.y + 1.3 * stranger.group.scale.y;
+      const dist = cam.wantLook.distanceTo(cam.wantPos), span = whole ? 3.6 : G.lookZone === 'blood' ? 1.9 : 1.1;
+      cam.wantFov = THREE.MathUtils.clamp(2 * Math.atan(span / 2 / dist) * 180 / Math.PI * (narrow ? 1.6 : 1), 2.5, 45);
+    } else {
+      const dist = Math.hypot(s.x, s.z - cam.wantPos.z);
+      cam.wantFov = THREE.MathUtils.clamp(2 * Math.atan(8 / dist) * 180 / Math.PI, narrow ? 46 : 23, narrow ? 60 : 40);
+      const halfH = dist * Math.tan(cam.wantFov * Math.PI / 360);
+      cam.wantLook.set(s.x * 0.5, s.y + 1.3 - halfH * (narrow ? 0.34 : 0.24), s.z);    // keep the monster in the open space above the cards
+    }
   } else {
     cam.wantPos.set(0, narrow ? 7 : 6.2, narrow ? 12 : 10); cam.wantLook.set(0, 1.2, -20);
   }
@@ -298,30 +428,30 @@ function setCameraTargets(t) {
 // ============================================================
 const G = {
   state: 'title', night: 0, hearts: MAX_HEARTS, coins: 12, score: 0, streak: 0,
-  oil: OIL_START, oilMax: OIL_START,
-  upgrades: { favor: false },
-  monster: null, progress: 0, found: 0, foundCount: 0, dwell: { zone: null, t: 0 }, auraDwell: 0, queue: [], inNight: 0, paused: false,
-  resolveTimer: 0, resolveMode: null, actor: null, u: 0.86, lead: 0,
-  probs: null, flipped: new Set(), owlZone: null, tipShown: false,
-  stats: { met: 0, right: 0, oracleRight: 0, hints: 0, tricksMet: 0, tricksBeaten: 0, earned: 0, oilBonus: 0, bestStreak: 0 },
+  upgrades: { favor: false, draught: false },
+  monster: null, progress: 0, asked: new Set(), asking: null, queue: [], inNight: 0, paused: false,
+  resolveTimer: 0, resolveMode: null, actor: null, u: 0.86, lead: 0, noDamage: false,
+  flipped: new Set(), owlZone: null, owlFinal: false, tipShown: false,
+  stats: { met: 0, right: 0, oracleRight: 0, hints: 0, tricksMet: 0, tricksBeaten: 0, earned: 0, bestStreak: 0, questions: 0 },
 };
 
 function hintCost() { return G.upgrades.favor ? 3 : HINT_COST; }
 
 function newGame() {
-  Object.assign(G, { night: 0, hearts: MAX_HEARTS, coins: 12, score: 0, streak: 0, oil: OIL_START, oilMax: OIL_START, upgrades: { favor: false }, tipShown: false,
-    stats: { met: 0, right: 0, oracleRight: 0, hints: 0, tricksMet: 0, tricksBeaten: 0, earned: 0, oilBonus: 0, bestStreak: 0 } });
-  lantern.on = true;
+  Object.assign(G, { night: 0, hearts: MAX_HEARTS, coins: 12, score: 0, streak: 0, upgrades: { favor: false, draught: false }, tipShown: false,
+    stats: { met: 0, right: 0, oracleRight: 0, hints: 0, tricksMet: 0, tricksBeaten: 0, earned: 0, bestStreak: 0, questions: 0 } });
   showNightIntro();
 }
 
 function pick(pool) { return pool[Math.floor(Math.random() * pool.length)]; }
+function pickClass() { let r = Math.random(); for (const c of CLASSES) { r -= CLASS_WEIGHT[c]; if (r < 0) return c; } return 'Zombie'; }
 function buildQueue(n) {
   const q = [], used = new Set(), cfg = NIGHTS[n];
   while (q.length < cfg.count) {
-    const m = Math.random() < cfg.trick ? pick(TRICK_POOL) : pick(n < 2 ? CLEAR_POOL : NORMAL_POOL);
+    const m = Math.random() < cfg.trick ? pick(TRICKS) : pick(FOLLOW[pickClass()]);
     if (!used.has(m)) { used.add(m); q.push(m); }
   }
+  if (n === NIGHTS.length - 1) q[q.length - 1] = pick(FOLLOW[pickClass()]);     // the Monster King always follows its rules
   return q;
 }
 
@@ -335,7 +465,7 @@ function showNightIntro() {
   $('#introNote').textContent = cfg.note;
   $('#introFacts').innerHTML = `
     <div><dt>Monsters</dt><dd>${cfg.count}</dd></div>
-    <div><dt>Oil</dt><dd>${Math.round(G.oil)}/${G.oilMax}</dd></div>
+    <div><dt>Gate</dt><dd>${G.hearts}/${MAX_HEARTS}</dd></div>
     <div><dt>Tricksters</dt><dd>${cfg.trick ? Math.round(cfg.trick * 100) + '%' : 'none'}</dd></div>`;
   $('#hud').hidden = true;
   show('nightIntro');
@@ -344,31 +474,36 @@ function showNightIntro() {
 
 function startNight() {
   G.queue = buildQueue(G.night); G.inNight = 0; G.state = 'play';
-  lantern.on = G.oil > 0;
+  lantern.on = true;
   hideScreens(); $('#hud').hidden = false; nextMonster();
 }
 
 function nextMonster() {
   if (G.queue.length === 0) return endNight();
   G.monster = G.queue.shift(); G.inNight++;
-  Object.assign(G, { progress: 0, found: 0, foundCount: 0, auraDwell: 0, resolveMode: null, owlZone: null, lead: 1.2 });
-  G.dwell = { zone: null, t: 0 };
-  stranger.reset(); stranger.group.visible = true;
+  Object.assign(G, { progress: 0, asked: new Set(), asking: null, resolveMode: null, owlZone: null, owlFinal: false, lead: 1.2, faceWaiting: false });
+  Object.values(walkers).forEach((w) => { w.group.visible = false; });
+  stranger = walkers[G.monster.cls]; stranger.reset(); stranger.group.visible = true;
+  G.boss = G.night === NIGHTS.length - 1 && G.queue.length === 0;
+  stranger.setBoss(G.boss);
+  Sound.startMusic();
+  G.lookZone = null; G.lookTimer = 0;
   if (G.actor) G.actor.group.visible = false;
   cameraMode = 'game';
   resetClues(); resetCards(); setCardsEnabled(true); updateCards(false);
   updateHud(); updateDistance();
-  if (G.night === 0 && !G.tipShown) banner(isTouch ? 'Drag the light onto its face, eyes, hands, hair or shadow' : 'Point the light at its face, eyes, hands, hair or shadow', 'tip', 6000);
+  if (G.boss) { banner('<strong>The Monster King</strong><span>Triple points. A wrong guess costs 2 lanterns</span>', 'bad', 4500); Sound.sting(); cam.shake = 0.5; }
+  else if (G.night === 0 && !G.tipShown) banner(`${isTouch ? 'Tap' : 'Click'} its face, hands, shadow or eyes to ask a question`, 'tip', 6000);
   else banner(`Monster ${G.inNight} of ${NIGHTS[G.night].count}`, 'tip', 1600);
   placeOnPath(stranger.group, 0);
   setCameraTargets(0); cam.fov = cam.wantFov; cam.pos.copy(cam.wantPos); cam.look.copy(cam.wantLook);
 }
 
 function walkSeconds() {
-  return NIGHTS[G.night].walk;
+  return NIGHTS[G.night].walk * (G.upgrades.draught ? 1.15 : 1);
 }
 function placeOnPath(obj, progress) {
-  const u = 0.86 - progress * 0.82;                              // from deep in the forest to just before the gate
+  const u = 0.55 - progress * 0.5;                               // from the forest edge to just before the gate
   if (obj === stranger.group) G.u = u;
   const p = PATH.getPointAt(Math.max(0, Math.min(1, u)));
   obj.position.set(p.x, pathLift(u), p.z);
@@ -376,25 +511,32 @@ function placeOnPath(obj, progress) {
   obj.lookAt(ahead.x, obj.position.y, ahead.z);
 }
 
-// ---------- clues: six chips above the cards ----------
+// ---------- questions: four buttons above the cards (or click the body part) ----------
 function resetClues() {
-  $('#clues').innerHTML = CLUE_ORDER.map((k) => `
-    <li class="chip" data-clue="${k}"><span class="chip-label">${CLUE_INFO[k].label}</span><span class="chip-value">${CLUE_INFO[k].where}</span></li>`).join('');
+  $('#clues').innerHTML = QUESTIONS.map((q) => `
+    <li><button type="button" class="chip" data-q="${q}"><span class="chip-label">${Q[q].label}</span><span class="chip-value"><span class="ask">ask · </span>${Q[q].where}</span></button></li>`).join('');
+  $$('.chip').forEach((b) => b.addEventListener('click', () => ask(b.dataset.q)));
 }
-function isFound(k) { return (G.found >> CLUE_ORDER.indexOf(k)) & 1; }
-function revealClue(k) {
-  if (isFound(k) || !G.monster) return;
-  const m = G.monster, info = CLUE_INFO[k], chip = $(`.chip[data-clue="${k}"]`);
-  G.found |= 1 << CLUE_ORDER.indexOf(k); G.foundCount++;
-  let text, word;
-  if (k === 'color') { word = m.color; text = `<span class="swatch" style="background:${GLOW_COLORS[m.color]}"></span>${m.color}`; stranger.reveal(k, m, 0); stranger.setAuraColor(GLOW_COLORS[m.color]); }
-  else { const v = m[info.field]; word = clueWord(k, v); text = word; stranger.reveal(k, m, percentile(k, v)); }
-  chip.querySelector('.chip-value').innerHTML = text; chip.classList.add('found');
-  popWord(k, word);
+function isAsked(q) { return G.asked.has(q); }
+function ask(q) {
+  if (G.state !== 'play' || G.paused || G.resolveMode || !G.monster || !QUESTIONS.includes(q) || isAsked(q) || G.asking) return;
+  G.asking = { q, t: 0 }; G.lookZone = q; G.lookTimer = 99; Sound.question();
+  const chip = $(`.chip[data-q="${q}"]`); if (chip) chip.classList.add('asking');
+}
+function answer(q) {
+  const m = G.monster, lv = levelOf(m, q), word = levelWord(q, lv), chip = $(`.chip[data-q="${q}"]`);
+  G.asked.add(q); G.asking = null; G.stats.questions++; G.lookTimer = 1.5;
+  chip.classList.remove('asking'); chip.classList.add('found'); chip.disabled = true;
+  chip.querySelector('.chip-value').innerHTML = q === 'color' ? `<span class="swatch" style="background:${GLOW_COLORS[m.color]}"></span>${word}` : word;
+  if (q === 'color') { stranger.reveal('color', m, 0); stranger.setAuraColor(GLOW_COLORS[m.color]); }
+  else stranger.reveal(q, m, percentile(q, m[Q[q].field]));
+  popWord(q, `${Q[q].label}: ${word}`);
+  pulseAt(q, q === 'color' ? GLOW_COLORS[m.color] : '#ffc46b');
   Sound.found();
-  if (!G.tipShown) { G.tipShown = true; banner('Each clue turns over the monsters it rules out', 'tip', 3500); }
-  if (G.owlZone === k) { G.owlZone = null; $('#owlMark').hidden = true; }
+  if (G.owlZone === q) { G.owlZone = null; $('#owlMark').hidden = true; }
+  $$(`.rule-row[data-q="${q}"]`).forEach((row) => { row.dataset.answer = lv; });      // show the answer on every card
   updateCards(true);
+  if (!G.tipShown) { G.tipShown = true; setTimeout(() => { if (G.state === 'play' && !G.resolveMode) banner('Cards whose rules don’t match turn over', 'tip', 3200); }, 900); }
 }
 const pops = [];
 function popWord(zone, text) {
@@ -413,76 +555,84 @@ function updatePops() {
   }
 }
 
-// ---------- monster cards ----------
+// ---------- monster cards: each card shows its monster's rules ----------
+function ruleRows(c) {
+  return QUESTIONS.map((q) => `<span class="rule-row" data-q="${q}"><i>${Q[q].label}</i>${[0, 1, 2, 3].map((lv) =>
+    `<b class="${RULES[c][q].includes(lv) ? 'on' : ''}" data-lv="${lv}"${q === 'color' ? ` style="--glow:${GLOW_COLORS[TELLS.colors[lv]]}"` : ''} title="${levelWord(q, lv)}"></b>`).join('')}</span>`).join('');
+}
 function buildCards() {
   $('#cards').innerHTML = CLASSES.map((c, i) => `
-    <button class="card" data-cls="${c}" id="card-${c}" type="button" aria-label="${c}: use the ${WEAPONS[c].name.toLowerCase()}">
+    <button class="card" data-cls="${c}" id="card-${c}" type="button" aria-label="${c}">
       <span class="card-inner">
-        <span class="card-face"><span class="c-key">${i + 1}</span><img class="c-portrait" src="${PORTRAITS[c]}" alt=""><span class="c-odds"><span class="c-bar"></span><b></b></span><span class="c-name">${c}</span><img class="c-weapon" src="${WEAPON_ICONS[c]}" alt="" title="${WEAPONS[c].name}"></span>
-        <span class="card-back"><span class="c-key">${i + 1}</span><span class="c-back-name">${c}</span><span class="c-back-note">unlikely</span></span>
+        <span class="card-face"><span class="c-key">${i + 1}</span><img class="c-portrait" src="${PORTRAITS[c]}" alt=""><img class="c-weapon" src="${WEAPON_ICONS[c]}" alt="" title="${WEAPONS[c].name}">
+          <span class="c-info"><span class="c-name">${c}</span><span class="c-rules">${ruleRows(c)}</span></span></span>
+        <span class="card-back"><span class="c-key">${i + 1}</span><span class="c-back-name">${c}</span><span class="c-back-note"></span></span>
       </span>
     </button>`).join('');
   $$('.card').forEach((b) => b.addEventListener('click', () => choose(b.dataset.cls)));
 }
 function setCardsEnabled(on) { $$('.card').forEach((b) => { b.disabled = !on; }); }
-function resetCards() { G.flipped = new Set(); $$('.card').forEach((b) => b.classList.remove('flipped', 'right', 'wrong', 'answer', 'last', 'likely')); }
+function resetCards() {
+  G.flipped = new Set();
+  $$('.card').forEach((b, i) => { b.style.setProperty('--d', `${i * 70}ms`); b.classList.remove('flipped', 'right', 'wrong', 'answer', 'last', 'shake'); });
+  $$('.rule-row').forEach((r) => { delete r.dataset.answer; });
+}
+function upCards() { return CLASSES.filter((c) => !G.flipped.has(c)); }
 function updateCards(withSound) {
   if (!G.monster) return;
-  const m = G.monster;
-  G.probs = consultMask(ORACLE_MODEL, OWL_ANY, m, G.found);
-  const best = G.probs.indexOf(Math.max(...G.probs));
-  let changed = false;
-  CLASSES.forEach((c, i) => {
-    // a card turns over when the model gives it under 6%. For honest monsters the real card never turns over.
-    const protect = c === m.cls && !m.trickster;
-    const down = G.probs[i] < FLIP_THRESHOLD && i !== best && !protect;
-    const card = $(`#card-${c}`);
-    if (down !== G.flipped.has(c)) { changed = true; if (down) G.flipped.add(c); else G.flipped.delete(c); card.classList.toggle('flipped', down); }
-  });
-  // show the odds on the cards still face up, scaled among themselves, and mark the most likely one
-  const up = CLASSES.filter((c) => !G.flipped.has(c));
-  const total = up.reduce((a, c) => a + G.probs[CLASSES.indexOf(c)], 0) || 1;
-  CLASSES.forEach((c, i) => {
-    const card = $(`#card-${c}`), pct = G.flipped.has(c) ? 0 : Math.round((G.probs[i] / total) * 100);
-    card.querySelector('.c-odds b').textContent = G.foundCount ? `${pct}%` : '';
-    card.querySelector('.c-bar').style.width = G.foundCount ? `${pct}%` : '0%';
-    card.classList.toggle('likely', G.foundCount > 0 && up.length > 1 && i === best);
-  });
+  const m = G.monster; let changed = false;
+  for (const c of CLASSES) {
+    if (G.flipped.has(c)) continue;
+    const bad = [...G.asked].find((q) => !fits(c, m, q));
+    if (!bad) continue;
+    G.flipped.add(c); changed = true;
+    const card = $(`#card-${c}`); card.classList.add('flipped');
+    card.querySelector('.c-back-note').textContent = `${Q[bad].label}: not ${levelWord(bad, levelOf(m, bad))}`;
+  }
+  const up = upCards();
   if (changed && withSound) Sound.flip();
   $$('.card').forEach((b) => b.classList.toggle('last', up.length === 1 && b.dataset.cls === up[0]));
-  if (changed && withSound && up.length === 1) banner(`Only the ${up[0]} is left. Pick it!`, 'owl', 2500);
+  if (withSound) {
+    if (up.length === 1) banner(`Only the ${up[0]} fits. Pick it!`, 'owl', 3200);
+    else if (up.length === 0) banner('No card fits. A trickster! Make your best guess', 'bad', 3800);
+    else if (G.asked.size === QUESTIONS.length) banner(`${up.length} cards fit. Pick one, or ask the Owl`, 'owl', 4000);
+  }
+  updateOwlButton();
 }
 
-// ---------- the Owl: one button that says where to look (and, from night 3, warns about tricksters) ----------
+// ---------- the Owl: which question to ask next, and (at the end) which card is more common ----------
 function updateOwlButton() {
   const busy = G.state !== 'play' || G.resolveMode !== null;
-  $('#askOracle').innerHTML = `Ask the Owl <small>${hintCost()} coins</small>`;
-  $('#askOracle').disabled = busy || G.coins < hintCost() || G.foundCount >= 6 || G.owlZone !== null;
+  const done = G.asked.size === QUESTIONS.length, up = upCards();
+  $('#askOracle').innerHTML = `<span>${done ? 'Which one?' : '<span class="owl-long">Ask the </span>Owl'}</span><small>${hintCost()} coins</small>`;
+  $('#askOracle').disabled = busy || G.coins < hintCost() || up.length === 1 || G.owlZone !== null || G.owlFinal || !!G.asking;
 }
-const BY_CLASS = Object.fromEntries(CLASSES.map((c) => [c, MONSTERS.filter((m) => m.cls === c)]));
-function bestClueToFind() {
-  // for each clue not found yet, imagine its value from monsters like this one and count how many cards it would flip
-  const probs = G.probs || consultMask(ORACLE_MODEL, OWL_ANY, G.monster, G.found);
-  let best = null, bestScore = -1;
-  for (const k of CLUE_ORDER) {
-    if (isFound(k)) continue;
-    const bit = 1 << CLUE_ORDER.indexOf(k); let score = 0;
-    for (let s = 0; s < 24; s++) {
-      const r = Math.random(); let acc = 0, ci = 0; for (; ci < probs.length - 1; ci++) { acc += probs[ci]; if (r < acc) break; }
-      const other = pick(BY_CLASS[CLASSES[ci]]);
-      const test = { ...G.monster, [CLUE_INFO[k].field]: other[CLUE_INFO[k].field] };
-      score += consultMask(ORACLE_MODEL, OWL_ANY, test, G.found | bit).filter((v) => v < FLIP_THRESHOLD).length;
-    }
-    if (score > bestScore) { bestScore = score; best = k; }
+function bestQuestion() {
+  // the question that, on average, turns over the most of the cards still up
+  const up = upCards(); let best = null, bestScore = -1;
+  for (const q of QUESTIONS) {
+    if (isAsked(q)) continue;
+    let score = 0;
+    for (const c of up) for (const lv of RULES[c][q]) score += up.filter((d) => !RULES[d][q].includes(lv)).length / RULES[c][q].length;
+    if (score > bestScore) { bestScore = score; best = q; }
   }
   return best;
 }
 function askOracle() {
-  if (G.state !== 'play' || G.resolveMode || G.coins < hintCost() || G.foundCount >= 6 || G.owlZone) return;
+  if ($('#askOracle').disabled) return;
   G.coins -= hintCost(); G.stats.hints++;
-  const k = bestClueToFind(); G.owlZone = k;
-  const warn = G.night >= 2 && G.monster.trickster ? ' · careful, this one is a trickster' : '';
-  banner(OWL_WHISPER[k] + warn, 'owl', 4000);
+  const warn = G.night >= 2 && isTrick(G.monster) ? ' · careful, this one breaks a rule' : '';
+  if (G.asked.size < QUESTIONS.length) {
+    const q = bestQuestion(); G.owlZone = q;
+    banner(Q[q].ask + warn, 'owl', 4000);
+  } else {
+    // all four answers are in: the neural network from notebook 03 says which card is most common for monsters like this
+    const mask = ['color', 'height', 'rot', 'blood'].reduce((a, k) => a | (1 << OWL_ANY.clue_order.indexOf(k)), 0);
+    const p = consultMask(ORACLE_MODEL, OWL_ANY, G.monster, mask);
+    const pool = upCards().length ? upCards() : CLASSES;
+    const top = pool.slice().sort((a, b) => p[CLASSES.indexOf(b)] - p[CLASSES.indexOf(a)])[0];
+    banner(`Monsters like this are most often a ${top}`, 'owl', 4500); G.owlFinal = true;
+  }
   Sound.oracle(); owl.ask(); updateHud();
 }
 
@@ -492,40 +642,44 @@ function choose(cls) {
   Sound.click(); useWeapon(cls); resolve(cls);
 }
 function resolve(choice) {
-  const m = G.monster, right = choice === m.cls, unused = 6 - G.foundCount;
+  const m = G.monster, right = choice === m.cls, unused = QUESTIONS.length - G.asked.size, trick = isTrick(m);
   const oracleTop = consult(ORACLE_MODEL, m, 6)[0].cls;
   G.stats.met++; if (oracleTop === m.cls) G.stats.oracleRight++;
-  if (m.trickster) G.stats.tricksMet++;
+  if (trick) G.stats.tricksMet++;
   setCardsEnabled(false);
   if (choice) $(`#card-${choice}`).classList.add(right ? 'right' : 'wrong');
   if (!right) $(`#card-${m.cls}`).classList.add('answer');
-  $('#ring').hidden = true; $('#owlMark').hidden = true;
+  $('#ring').hidden = true; $('#owlMark').hidden = true; G.asking = null; Sound.stopMusic();
 
   // the lantern blazes and the monster is right there
   stranger.group.visible = false;
   cameraMode = 'scare'; setCameraTargets(0); cam.pos.copy(cam.wantPos); cam.look.copy(cam.wantLook); cam.fov = cam.wantFov;
-  G.actor = actors[m.cls]; G.actor.reset(); G.actor.group.visible = true;
+  G.actor = actors[m.cls]; G.actor.reset(); G.actor.group.visible = true; if (G.boss) G.actor.group.scale.setScalar(1.3);
   G.actor.group.position.set(0, 0, -1.6); G.actor.group.lookAt(0, 0, 8);
-  flash('white'); Sound.sting(); cam.shake = 0.35;
+  flash(right ? 'gold' : 'white'); cam.shake = right ? 0.15 : 0.45;
+  if (right) Sound.correct(); else { Sound.sting(); setTimeout(() => Sound.wrong(), 350); }
 
   let msg, sub = '';
   if (right) {
     G.noDamage = false; G.streak++; G.stats.bestStreak = Math.max(G.stats.bestStreak, G.streak);
     const mult = Math.min(5, G.streak);
-    const coins = 3 + unused + (mult >= 3 ? 2 : 0), pts = (100 + unused * 30) * mult * (m.trickster ? 2 : 1);
+    const coins = 3 + unused * 2 + (mult >= 3 ? 2 : 0) + (G.boss ? 20 : 0), pts = (100 + unused * 60) * mult * (trick ? 2 : 1) * (G.boss ? 3 : 1);
     G.coins += coins; G.stats.earned += coins; G.score += pts; G.stats.right++;
-    if (m.trickster) G.stats.tricksBeaten++;
+    if (trick) G.stats.tricksBeaten++;
     G.resolveMode = 'defeat';
-    msg = `${m.cls}! Right`;
+    msg = G.boss ? `The Monster King falls!` : `${m.cls}! Right`;
     sub = `+${pts} points · +${coins} coins${mult > 1 ? ` · streak x${mult}` : ''}`;
-    setTimeout(() => Sound.win(), 900);
+    setTimeout(() => Sound.win(), 1250);
+    scorePop(`+${pts}`, 'good');
   } else {
-    G.streak = m.trickster && choice ? G.streak : 0;
-    G.resolveMode = 'attack'; G.noDamage = !!(m.trickster && choice);
+    G.streak = trick && choice ? G.streak : 0;
+    G.resolveMode = 'attack'; G.noDamage = !!(trick && choice);
     msg = choice ? `It was a ${m.cls}` : `Too late! A ${m.cls}`;
-    sub = G.noDamage ? 'A trickster fooled the cards. No harm done' : 'The gate loses a lantern';
+    const b = brokenRules(m)[0];
+    sub = G.noDamage ? `A trickster: its ${Q[b].label.toLowerCase()} broke the rule. No harm done` : G.boss ? 'The Monster King breaks 2 lanterns' : 'The gate loses a lantern';
+    if (choice) { const card = $(`#card-${choice}`); card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); }
   }
-  if (m.trickster && right) sub += ' · trickster, double points';
+  if (trick && right) sub += ' · trickster, double points';
   banner(`<strong>${msg}</strong><span>${sub}</span>`, right ? 'good' : 'bad', 2800);
   G.resolveTimer = 0; updateHud();
 }
@@ -537,33 +691,30 @@ function afterResolve() {
 }
 
 function endNight() {
-  G.state = 'shop'; stranger.group.visible = false;
-  const bonus = Math.round(G.oil) * 3; G.score += bonus; G.stats.oilBonus += bonus; G.lastOilBonus = bonus;
+  G.state = 'shop'; stranger.group.visible = false; Sound.stopMusic(); G.upgrades.draught = false;
   if (G.night === NIGHTS.length - 1) return endGame(true);
   G.night++;
-  G.oil = Math.max(G.oil, OIL_DAWN_MIN);                            // the village spares you a little oil each dawn
   openShop();
 }
 
 // ---------- shop ----------
 const SHOP = [
-  { id: 'refill', name: 'Refill the lantern', text: 'Oil back to full', cost: 15, can: () => G.oil < G.oilMax - 1, buy: () => { G.oil = G.oilMax; } },
   { id: 'mend', name: 'Mend the gate', text: 'Get back 1 gate lantern', cost: 25, can: () => G.hearts < MAX_HEARTS, buy: () => { G.hearts++; } },
   { id: 'favor', name: 'Feed the Owl', text: 'Owl hints cost 3 coins', cost: 30, can: () => !G.upgrades.favor, buy: () => { G.upgrades.favor = true; } },
-]
+  { id: 'draught', name: 'Sleeping draught', text: 'Next night the monsters walk 15% slower', cost: 20, can: () => !G.upgrades.draught, buy: () => { G.upgrades.draught = true; } },
+];
 function openShop() {
   $('#hud').hidden = true; banner('');
   $('#shopTitle').textContent = `Dawn after night ${G.night}`;
-  $('#shopSub').textContent = `Oil bonus +${G.lastOilBonus} points · Next: ${NIGHTS[G.night].name}`;
+  $('#shopSub').textContent = `Next: ${NIGHTS[G.night].name}`;
   $('#shopGo').textContent = `Start night ${G.night + 1}`;
   renderShop(); updateHud(); show('shop');
 }
 function renderShop() {
   $('#shopCoins').textContent = G.coins;
-  $('#shopOil').textContent = `${Math.round(G.oil)}/${G.oilMax}`;
   $('#shopItems').innerHTML = SHOP.map((it) => {
     const avail = it.can(), afford = G.coins >= it.cost;
-    const label = !avail ? (it.id === 'mend' || it.id === 'refill' ? 'Full' : 'Owned') : `${it.cost} coins`;
+    const label = !avail ? (it.id === 'mend' ? 'Full' : 'Owned') : `${it.cost} coins`;
     return `<li class="shop-item"><div><h3>${it.name}</h3><p>${it.text}</p></div>
       <button type="button" class="btn small" id="buy-${it.id}" data-id="${it.id}" ${!avail || !afford ? 'disabled' : ''}>${label}</button></li>`;
   }).join('');
@@ -578,6 +729,11 @@ function endGame(won) {
   G.state = 'end'; stranger.group.visible = false; $('#hud').hidden = true;
   const s = G.stats, pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
   const best = Math.max(Number(safeGet('boowho-best') || 0), G.score); safeSet('boowho-best', String(best));
+  const today = new Date().toISOString().slice(0, 10);
+  let board = []; try { board = JSON.parse(safeGet('boowho-board') || '[]'); } catch { board = []; }
+  const entry = { score: G.score, night: won ? NIGHTS.length : G.night + 1, won, date: today, id: Date.now() };
+  board.push(entry); board.sort((a, b) => b.score - a.score); board = board.slice(0, 5); safeSet('boowho-board', JSON.stringify(board));
+  const todayBest = Math.max(Number(safeGet(`boowho-day-${today}`) || 0), G.score); safeSet(`boowho-day-${today}`, String(todayBest));
   $('#endEyebrow').textContent = won ? 'Dawn breaks' : `Night ${G.night + 1} · ${NIGHTS[G.night].name}`;
   $('#endTitle').textContent = won ? 'The village is safe' : 'The gate has fallen';
   $('#endText').textContent = won ? 'You held the gate through Halloween.' : `The monsters broke through on night ${G.night + 1}.`;
@@ -587,9 +743,12 @@ function endGame(won) {
     <div><dt>Best streak</dt><dd>x${Math.min(5, s.bestStreak)}</dd></div>
     <div><dt>You vs Owl</dt><dd>${pct(s.right, s.met)}% · ${pct(s.oracleRight, s.met)}%</dd></div>`;
   $('#endVersus').textContent = !s.met ? '' : s.right > s.oracleRight ? 'You beat the Owl!'
-    : s.right === s.oracleRight ? 'You tied with the Owl.' : 'The Owl did better. Look at the hands and the face.';
-  $('#endVersus').insertAdjacentHTML('beforeend', `<span class="best">Best score: ${best.toLocaleString()} · Oil bonus: ${s.oilBonus}</span>`);
+    : s.right === s.oracleRight ? 'You tied with the Owl.' : 'The Owl did better. Ask all four questions before you pick.';
+  $('#endVersus').insertAdjacentHTML('beforeend', `<span class="best">Best score: ${best.toLocaleString()} · ${s.met ? (s.questions / s.met).toFixed(1) : 0} questions per monster</span>`);
+  $('#endBoard').innerHTML = `<h3>Best scores <small>today's record: ${todayBest.toLocaleString()}</small></h3>` + board.map((b, i) =>
+    `<li class="${b.id === entry.id ? 'me' : ''}"><span>${i + 1}</span><b>${b.score.toLocaleString()}</b><em>${b.won ? 'Won' : `Night ${b.night}`}</em><time>${b.date.slice(5).replace('-', '/')}</time></li>`).join('');
   $('#end').classList.toggle('won', won);
+  Sound.stopMusic();
   show('end'); if (won) Sound.win(); else Sound.hit();
 }
 
@@ -603,15 +762,7 @@ function updateHud() {
   $('#hearts').setAttribute('aria-label', `Gate health ${G.hearts} of ${MAX_HEARTS}`);
   const mult = Math.min(5, G.streak);
   $('#streak').textContent = mult >= 2 ? `x${mult}` : ''; $('#streak').hidden = mult < 2;
-  updateOil(); updateOwlButton();
-}
-function updateOil() {
-  const btn = $('#lanternBtn');
-  btn.style.setProperty('--oil', (G.oil / G.oilMax).toFixed(3));
-  btn.classList.toggle('low', G.oil < 20);
-  btn.innerHTML = `${G.oil <= 0 ? 'No oil' : lantern.on ? 'Lantern on' : 'Lantern off'} <small>oil ${Math.round(G.oil)}</small>`;
-  btn.setAttribute('aria-pressed', String(lantern.on));
-  btn.disabled = G.oil <= 0;
+  updateOwlButton();
 }
 function updateDistance() {
   const meters = Math.max(0, Math.round(PATH_METERS * (1 - G.progress)));
@@ -625,7 +776,11 @@ function banner(html, kind = 'tip', ms = 3000) {
   const b = $('#banner'); clearTimeout(bannerTimer);
   if (!html) { b.hidden = true; return; }
   b.className = `banner ${kind}`; b.innerHTML = html; b.hidden = false;
-  bannerTimer = setTimeout(() => { b.hidden = true; }, ms);
+  bannerTimer = setTimeout(() => { b.classList.add('out'); bannerTimer = setTimeout(() => { b.hidden = true; }, 320); }, ms);
+}
+function scorePop(text, kind) {
+  const el = document.createElement('div'); el.className = `score-pop ${kind}`; el.textContent = text;
+  $('#hud').appendChild(el); setTimeout(() => el.remove(), 1600);
 }
 function toast(title, sub, kind) { banner(`<strong>${title}</strong><span>${sub}</span>`, kind, 3000); }
 
@@ -637,32 +792,16 @@ function buildJournal() {
 function openJournalPage(i) {
   focusIndex = i; const c = CLASSES[i], j = JOURNAL[c];
   $$('.jtab').forEach((b, k) => b.setAttribute('aria-selected', String(k === i)));
-  const stat = (label, key, fmt) => {
-    const v = j.means[key], p = percentile(key === 'height' ? 'height' : key === 'hairLength' ? 'hair' : key === 'aura' ? 'aura' : key === 'bloodCoverage' ? 'blood' : 'rot', v);
-    return `<li><span>${label}</span><span class="js-track"><span class="js-fill" style="width:${Math.max(4, p * 100).toFixed(0)}%"></span></span><b>${fmt(v)}</b></li>`;
-  };
   $('#journalPage').innerHTML = `
     <h2>${c}</h2>
     <p class="lore">${j.lore}</p>
     <p class="weapon-line"><img src="${WEAPON_ICONS[c]}" alt=""> Weapon: <b>${WEAPONS[c].name.toLowerCase()}</b></p>
-    <h3>Average clues</h3>
-    <ul class="jstats">
-      ${stat('Height', 'height', (v) => v.toFixed(0))}
-      ${stat('Hair', 'hairLength', (v) => v.toFixed(1))}
-      ${stat('Aura', 'aura', (v) => v.toFixed(2))}
-      ${stat('Rot', 'rottingFleshPct', (v) => `${Math.round(v)}%`)}
-      ${stat('Blood', 'bloodCoverage', (v) => `${Math.round(v)}%`)}
-    </ul>
-    <h3>Glow</h3>
-    <ul class="jcolors">${COLOR_NAMES.map((cn) => `<li><span class="swatch" style="background:${GLOW_COLORS[cn]}"></span>${cn}<b>${Math.round(j.colors[cn])}%</b></li>`).join('')}</ul>`;
+    <h3>Rules <small>lit boxes are what a ${c.toLowerCase()} can have</small></h3>
+    <div class="j-rules">${QUESTIONS.map((q) => `<div class="j-rule"><span>${Q[q].label} <small>(${Q[q].where})</small></span><div>${[0, 1, 2, 3].map((lv) =>
+      `<em class="${RULES[c][q].includes(lv) ? 'on' : ''}"${q === 'color' ? ` style="--glow:${GLOW_COLORS[TELLS.colors[lv]]}"` : ''}>${levelWord(q, lv)}</em>`).join('')}</div></div>`).join('')}</div>`;
 }
 
 // ---------- input ----------
-function setLantern(on) {
-  if (on && G.oil <= 0) return;
-  if (lantern.on !== on) Sound.lantern(on);
-  lantern.on = on; G.auraDwell = 0; updateOil();
-}
 function bind() {
   buildCards(); buildJournal();
   $('#playBtn').addEventListener('click', () => { Sound.init(); Sound.startAmbience(); Sound.click(); newGame(); });
@@ -674,7 +813,6 @@ function bind() {
   $('#shopGo').addEventListener('click', showNightIntro);
   $('#againBtn').addEventListener('click', newGame);
   $('#askOracle').addEventListener('click', askOracle);
-  $('#lanternBtn').addEventListener('click', () => setLantern(!lantern.on));
   $('#pauseBtn').addEventListener('click', togglePause);
   $('#resumeBtn').addEventListener('click', togglePause);
   $('#quitBtn').addEventListener('click', () => { G.paused = false; goTitle(); });
@@ -687,30 +825,34 @@ function bind() {
     lantern.pointerPx = { x: e.clientX - r.left, y: e.clientY - r.top }; lantern.hasPointer = true;
   };
   el.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse' || e.buttons) aim(e); });
-  el.addEventListener('pointerdown', (e) => { aim(e); if (e.button === 2) setLantern(!lantern.on); });
+  el.addEventListener('pointerdown', (e) => { aim(e); const z = zoneAt(); if (z) ask(z); });
   el.addEventListener('contextmenu', (e) => e.preventDefault());
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') { if (G.state === 'play') { togglePause(); e.preventDefault(); } return; }
     if (G.state === 'play' && !G.paused) {
       const n = Number(e.key); if (n >= 1 && n <= 5) choose(CLASSES[n - 1]);
       if (e.key === 'o' || e.key === 'O') askOracle();
-      if (e.key === 'l' || e.key === 'L') setLantern(!lantern.on);
     }
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden && G.state === 'play' && !G.paused) togglePause(); });
 }
+function zoneAt() {
+  if (G.state !== 'play' || !stranger.group.visible) return null;
+  lantern.ray.setFromCamera(lantern.pointer, camera);
+  const h = lantern.ray.intersectObjects(stranger.zones, false).find((x) => QUESTIONS.includes(x.object.userData.zone));
+  return h ? h.object.userData.zone : null;
+}
 function togglePause() {
   if (G.state !== 'play') return;
   G.paused = !G.paused;
-  if (G.paused) show('pause'); else hideScreens();
+  if (G.paused) { show('pause'); Sound.stopMusic(); } else { hideScreens(); if (!G.resolveMode) Sound.startMusic(); }
 }
 function goTitle() {
-  G.state = 'title'; G.paused = false; cameraMode = 'title'; world.setMood('normal');
+  Sound.stopMusic(); G.state = 'title'; G.paused = false; cameraMode = 'title'; world.setMood('normal');
   stranger.group.visible = false; if (G.actor) G.actor.group.visible = false; G.actor = null; G.resolveMode = null;
   showcase.forEach((a) => { a.group.visible = true; });
   $('#hud').hidden = true; banner('');
   const best = Number(safeGet('boowho-best') || 0);
-  $('#bestLine').textContent = best ? `Best: ${best.toLocaleString()}` : '';
   show('title');
 }
 
@@ -720,53 +862,44 @@ function goTitle() {
 const audio = { step: 0, beat: 0 };
 function updateLantern(dt, t) {
   const playing = G.state === 'play' && !G.paused && !G.resolveMode && stranger.group.visible;
-  const on = playing && lantern.on && G.oil > 0;
-  // where the lantern points: at the pointer, or at the stranger's chest before the player aims
-  if (!lantern.hasPointer && playing) { stranger.zonePosition('blood', vTmp).project(camera); lantern.pointer.set(vTmp.x, vTmp.y + 0.1); }
-  lantern.ray.setFromCamera(lantern.pointer, camera);
-  const hits = playing ? lantern.ray.intersectObjects(stranger.zones, false) : [];
-  lantern.hit = hits.length ? hits[0].object.userData.zone : null;
-  if (hits.length) lantern.hitPoint.copy(hits[0].point);
-  else lantern.ray.ray.at(stranger.group.visible ? camera.position.distanceTo(stranger.group.position) : 30, lantern.hitPoint);
-  // the beam: a spotlight from just beside the camera, a small circle wherever it lands
+  // where the lantern points: at the body part being asked about, else at the pointer (or the chest before the player aims)
+  if (G.asking && playing) { stranger.zonePosition(G.asking.q, lantern.hitPoint); lantern.hit = G.asking.q; }
+  else {
+    if (!lantern.hasPointer && playing) { stranger.zonePosition('blood', vTmp).project(camera); lantern.pointer.set(vTmp.x, vTmp.y + 0.1); }
+    lantern.ray.setFromCamera(lantern.pointer, camera);
+    const hits = playing ? lantern.ray.intersectObjects(stranger.zones, false) : [];
+    const h = hits.find((x) => QUESTIONS.includes(x.object.userData.zone));
+    lantern.hit = h ? h.object.userData.zone : null;
+    if (hits.length) lantern.hitPoint.copy(hits[0].point);
+    else lantern.ray.ray.at(stranger.group.visible ? camera.position.distanceTo(stranger.group.position) : 30, lantern.hitPoint);
+  }
   lantern.beam.position.copy(camera.position).add(vTmp2.set(0.6, -0.4, 0).applyQuaternion(camera.quaternion));
   lantern.beam.target.position.copy(lantern.hitPoint);
   const dist = lantern.beam.position.distanceTo(lantern.hitPoint);
-  lantern.beam.angle = Math.min(0.6, Math.atan(1.0 * 1.7 / dist));
+  lantern.beam.angle = Math.min(0.6, Math.atan((G.asking || G.lookZone ? 0.8 : 1.6) * 1.7 / dist));
   const flick = 0.9 + 0.08 * Math.sin(t * 17) + 0.04 * Math.random();
-  lantern.beam.intensity += ((on ? 18 * flick : 0) - lantern.beam.intensity) * Math.min(1, dt * 12);
-  lantern.glow.position.copy(lantern.beam.position); lantern.glow.intensity = on ? 3 * flick : 0;
-  $('#lanternFx').classList.toggle('on', on);
+  lantern.beam.intensity += ((playing ? (G.asking || G.lookZone ? 7 : 22) * flick : 0) - lantern.beam.intensity) * Math.min(1, dt * 12);
+  lantern.glow.position.copy(lantern.beam.position); lantern.glow.intensity = playing ? 3 * flick : 0;
+  $('#lanternFx').classList.toggle('on', playing);
+  const ring = $('#ring'), mark = $('#owlMark');
+  if (!playing) { ring.hidden = true; mark.hidden = true; return; }
 
-  if (!playing) { $('#ring').hidden = true; $('#owlMark').hidden = true; return; }
-  // oil burns only while the lantern is lit
-  if (on) { G.oil = Math.max(0, G.oil - dt * OIL_BURN); if (G.oil <= 0) { lantern.on = false; banner('Out of oil. Pick from the cards you have.', 'bad', 3000); } updateOil(); }
-
-  // finding clues: hold the light on one body part for a second
-  let ringZone = null, ringFrac = 0;
-  if (on && lantern.hit && !isFound(lantern.hit)) {
-    if (G.dwell.zone !== lantern.hit) G.dwell = { zone: lantern.hit, t: 0 };
-    G.dwell.t += dt; ringZone = lantern.hit; ringFrac = G.dwell.t / DWELL;
-    if (G.dwell.t >= DWELL) { revealClue(lantern.hit); G.dwell = { zone: null, t: 0 }; }
-  } else G.dwell = { zone: null, t: 0 };
-  // the aura shows only in the dark: keep the lantern off for a moment
-  if (!on && !isFound('aura')) {
-    G.auraDwell += dt; ringZone = 'aura'; ringFrac = G.auraDwell / AURA_DWELL;
-    if (G.auraDwell >= AURA_DWELL) { revealClue('aura'); G.auraDwell = 0; }
-  }
   const w = canvasHost.clientWidth, h = canvasHost.clientHeight;
   const toScreen = (zone) => { stranger.zonePosition(zone, vTmp).project(camera); return [(vTmp.x * 0.5 + 0.5) * w, (-vTmp.y * 0.5 + 0.5) * h]; };
-  const ring = $('#ring');
-  if (ringZone) {
-    ring.hidden = false; ring.style.setProperty('--p', Math.min(1, ringFrac).toFixed(3));
-    let x = lantern.pointerPx.x, y = lantern.pointerPx.y;
-    if (ringZone === 'aura' || !lantern.hasPointer) [x, y] = toScreen(ringZone);
-    ring.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
-    ring.dataset.label = CLUE_INFO[ringZone].label;
+  if (G.asking) {
+    G.asking.t += dt;
+    const [x, y] = toScreen(G.asking.q);
+    ring.hidden = false; ring.classList.remove('hover'); ring.style.setProperty('--p', Math.min(1, G.asking.t / ASK_TIME).toFixed(3));
+    ring.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`; ring.dataset.label = Q[G.asking.q].label;
+    if (G.asking.t >= ASK_TIME) answer(G.asking.q);
+  } else if (lantern.hit && !isAsked(lantern.hit) && lantern.hasPointer && !isTouch) {
+    ring.hidden = false; ring.classList.add('hover'); ring.style.setProperty('--p', '0');
+    ring.style.transform = `translate(${lantern.pointerPx.x}px, ${lantern.pointerPx.y}px) translate(-50%, -50%)`;
+    ring.dataset.label = `${Q[lantern.hit].label}? click`;
   } else ring.hidden = true;
-  // the Owl's marker sits on the body part it pointed at, until that clue is found
-  const mark = $('#owlMark');
-  if (G.owlZone && G.owlZone !== 'aura') { const [x, y] = toScreen(G.owlZone); mark.hidden = false; mark.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`; }
+  renderer.domElement.style.cursor = lantern.hit && !isAsked(lantern.hit) ? 'pointer' : 'crosshair';
+  // the Owl's marker sits on the body part it suggested, until that question is asked
+  if (G.owlZone) { const [x, y] = toScreen(G.owlZone); mark.hidden = false; mark.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`; }
   else mark.hidden = true;
 }
 
@@ -774,6 +907,7 @@ function updateLantern(dt, t) {
 // Main loop
 // ============================================================
 const clock = new THREE.Clock();
+const bolt = { timer: 12, t: 9, base: world.hemi.intensity };
 const hudEl = $('#hud');
 let elapsed = 0;
 function frame() {
@@ -782,16 +916,18 @@ function frame() {
   const t = elapsed;
 
   updateLantern(dt, t);
+  if (G.lookZone && !G.asking) { G.lookTimer -= dt; if (G.lookTimer <= 0 || G.resolveMode) G.lookZone = null; }
+  $('#spyglass').classList.toggle('on', !!G.lookZone && G.state === 'play');
   const resolving = !!G.resolveMode; if (resolving !== hudEl.classList.contains('resolving')) hudEl.classList.toggle('resolving', resolving);
   if (G.state === 'play' && !G.paused) {
     if (!G.resolveMode) {
       const rate = 1 / walkSeconds();
       if (G.lead > 0) G.lead -= dt; else G.progress += dt * rate;                  // a short pause before it starts walking
-      placeOnPath(stranger.group, Math.min(1, G.progress)); stranger.animate(t, dt, !(lantern.on && G.oil > 0));
+      placeOnPath(stranger.group, Math.min(1, G.progress)); stranger.animate(t, dt, false);
       updateDistance();
       audio.step -= dt; audio.beat -= dt;
       if (audio.step <= 0) { Sound.step(0.04 + 0.42 * G.progress * G.progress); audio.step = (0.3 + walkSeconds() / 70) / (rate * walkSeconds()); }
-      if (G.progress > 0.62 && audio.beat <= 0) { const k = (G.progress - 0.62) / 0.38; Sound.heartbeat(0.18 + 0.4 * k); audio.beat = 1.05 - 0.55 * k; }
+      Sound.intensity = Math.min(1, G.progress * 1.05 + (G.boss ? 0.25 : 0));
       if (G.progress >= 1) resolve(null);
     } else {
       G.resolveTimer += dt; const a = G.actor, rt = G.resolveTimer;
@@ -802,14 +938,24 @@ function frame() {
       } else {
         a.animate(t, 'attack', 1.6);
         if (rt > 0.9 && rt < 1.5) { const k = (rt - 0.9) / 0.6; a.group.position.z = -1.6 + 2.6 * k * k; }        // it lunges at you
-        if (rt >= 1.5 && rt - dt < 1.5 && !G.noDamage) { G.hearts--; cam.shake = 1.0; Sound.hit(); flash('red'); updateHud(); }
+        if (rt >= 1.5 && rt - dt < 1.5 && !G.noDamage) { G.hearts = Math.max(0, G.hearts - (G.boss ? 2 : 1)); cam.shake = 1.0; Sound.hit(); flash('red'); updateHud(); }
       }
       if (rt > 3.0) afterResolve();
     }
   }
 
   showcase.forEach((a, i) => { if (a.group.visible) a.animate(t + i * 1.7, 'idle'); });
-  sparkles.update(dt);
+  sparkles.update(dt); updatePulses(dt); updateFlies(t);
+  // lightning now and then while a night is running
+  if (G.state === 'play' && !G.paused) {
+    bolt.timer -= dt;
+    if (bolt.timer <= 0) { bolt.timer = 16 + Math.random() * 18; bolt.t = 0; Sound.thunder(); }
+  }
+  if (bolt.t < 0.6) {
+    bolt.t += dt; const k = bolt.t;
+    const f = (k < 0.08 ? 1 : k < 0.16 ? 0.2 : k < 0.26 ? 0.8 : Math.max(0, 1 - (k - 0.26) / 0.34) * 0.4);
+    world.hemi.intensity = bolt.base + f * 2.6; filmPass.uniforms.uFlicker.value = 1 + f * 0.35;
+  } else if (bolt.base !== null) world.hemi.intensity = bolt.base;
   animateWeapon(dt);
   updatePops();
   const lookingBack = cameraMode === 'title' || cameraMode === 'journal';
@@ -836,13 +982,39 @@ function frame() {
   camera.lookAt(cam.look.x + Math.sin(t * 0.31) * 0.05 * zoomCalm, cam.look.y + Math.sin(t * 0.53) * 0.04 * zoomCalm, cam.look.z);
   filmPass.uniforms.uTime.value = t;
   filmPass.uniforms.uFlicker.value += ((0.96 + 0.03 * Math.sin(t * 23) + 0.02 * Math.random() - (Math.random() < 0.004 ? 0.12 : 0)) - filmPass.uniforms.uFlicker.value) * 0.5;
+  renderFigure();
   composer.render();
   requestAnimationFrame(frame);
 }
-function flash(kind = 'red') { const f = $('#flash'); f.className = kind === 'white' ? 'white' : ''; void f.offsetWidth; f.classList.add('on'); }
+const clearTmp = new THREE.Color();
+function renderFigure() {
+  const on = G.state === 'play' && stranger.group.visible && !G.resolveMode;
+  figPass.uniforms.uOn.value = on ? 1 : 0;
+  if (!on) return;
+  const bg = scene.background; scene.background = null;
+  renderer.getClearColor(clearTmp); const alpha = renderer.getClearAlpha();
+  renderer.setClearColor(0x000000, 0); camera.layers.set(1);
+  renderer.setRenderTarget(figRT); renderer.clear(); renderer.render(scene, camera);
+  SHARP.value = 1; stranger.sharpPass(true);
+  renderer.setRenderTarget(sharpRT); renderer.clear(); renderer.render(scene, camera);
+  SHARP.value = 0; stranger.sharpPass(false);
+  camera.layers.set(0); scene.background = bg; renderer.setClearColor(clearTmp, alpha);
+  // blur strength follows how big the figure is on screen, so it stays hard to read up close too
+  const dist = camera.position.distanceTo(stranger.group.position);
+  const px = (2.7 * stranger.group.scale.y) / (2 * dist * Math.tan(camera.fov * Math.PI / 360)) * figRT.height;
+  const spread = THREE.MathUtils.clamp(px * 0.012, 0.8, 7);
+  for (let i = 0; i < 2; i++) {
+    blurPass.uniforms.uDir.value.set(spread / figRT.width, 0); blurPass.render(renderer, blurA, i ? blurB : figRT);
+    blurPass.uniforms.uDir.value.set(0, spread / figRT.height); blurPass.render(renderer, blurB, blurA);
+  }
+  renderer.setRenderTarget(null);
+}
+function flash(kind = 'red') { const f = $('#flash'); f.className = kind === 'red' ? '' : kind; void f.offsetWidth; f.classList.add('on'); }
 
+scene.traverse((o) => { if (o.isLight && !o.layers.isEnabled(1)) o.layers.enable(1); });
+lantern.ray.layers.enable(1);
 bind(); goTitle(); setCameraTargets(0); cam.pos.copy(cam.wantPos); cam.look.copy(cam.wantLook);
 $('#loading').hidden = true;
 window.__nightWatchReady = true;
-window.__nightWatch = { G, timeScale: 1, camera, showcase, actors, THREE, cam, world, lantern, stranger, revealClue, setCameraMode: (m) => { cameraMode = m; } };   // handle for testing
+window.__nightWatch = { G, timeScale: 1, nextMonster, camera, renderer, figRT, sharpRT, blurB, figPass, SHARP, scene, showcase, actors, THREE, cam, world, lantern, get stranger() { return stranger; }, walkers, ask, answer, levelOf, RULES, isTrick, upCards, setCameraMode: (m) => { cameraMode = m; } };   // handle for testing
 requestAnimationFrame(frame);

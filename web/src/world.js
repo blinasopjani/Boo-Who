@@ -160,8 +160,8 @@ function buildWorld(scene) {
   world.setMoonSide(-1);
 
   // ---------- lights: dim cold moonlight, almost nothing else ----------
-  world.hemi = new THREE.HemisphereLight('#6a7ba2', '#141614', 1.25); scene.add(world.hemi);
-  const moonLight = new THREE.DirectionalLight('#b3c6e8', 1.6);
+  world.hemi = new THREE.HemisphereLight('#7c8db4', '#1c1f1c', 1.7); scene.add(world.hemi);
+  const moonLight = new THREE.DirectionalLight('#b3c6e8', 2.3);
   moonLight.position.set(-30, 45, -35); moonLight.target.position.set(0, 0, -15);
   moonLight.castShadow = true; moonLight.shadow.mapSize.set(1024, 1024);
   Object.assign(moonLight.shadow.camera, { left: -26, right: 26, top: 34, bottom: -34, near: 5, far: 130 });
@@ -227,7 +227,7 @@ function buildWorld(scene) {
     const model = gloom(MODELS[kind].clone(), 0.55, 0.7, new THREE.Color('#7a7f8c'));
     const pl = [];
     for (let i = 0; i < 70; i++) {
-      const s = freeSpot(k === 3 ? 3.5 : 4.5); if (!s) continue;
+      const s = freeSpot(k === 3 ? 6 : 7); if (!s) continue;
       pl.push({ x: s.x, y: groundHeight(s.x, s.z, s.d) - 0.1, z: s.z, s: rand(3.2, 5.2), ry: rand(0, TAU), rx: rand(-0.08, 0.08), rz: rand(-0.08, 0.08) });
     }
     instanced(scene, model, pl);
@@ -449,7 +449,7 @@ function buildWorld(scene) {
   world.setMood = (mood) => {
     world.moodName = mood;
     scene.background = world.sky[mood] || world.sky.normal;
-    const fog = { normal: ['#1b2232', 0.021], fog: ['#2a303b', 0.04], blood: ['#2a1216', 0.029], halloween: ['#1f1729', 0.029] }[mood] || ['#1b2232', 0.027];
+    const fog = { normal: ['#1f2738', 0.011], fog: ['#2c3240', 0.02], blood: ['#2c1519', 0.014], halloween: ['#231a2e', 0.014] }[mood] || ['#1f2738', 0.011];
     scene.fog.color.set(fog[0]); scene.fog.density = fog[1];
     const moonC = mood === 'blood' ? '#c8402e' : mood === 'halloween' ? '#d49a52' : '#d9dde6';
     world.moon.material.color.set(moonC); world.moonHalo.material.color.set(mood === 'blood' ? '#8a2a20' : mood === 'halloween' ? '#8a5a2a' : '#9fb0d0');
@@ -835,7 +835,7 @@ function makeStranger() {
     },
     reveal(clue, m, pct) {
       if (clue === 'hair') target.hair = 0.06 + pct * 0.75;
-      if (clue === 'color') { const c = GLOW_COLORS[m.color]; eyeMat.color.set(c); eyeLight.color.set(c); eyeLight.intensity = 3; }
+      if (clue === 'color') { colorOn = true; const c = GLOW_COLORS[m.color]; eyeMat.color.set(c); eyeLight.color.set(c); eyeLight.intensity = 3; }
       if (clue === 'rot') target.rot = pct;
       if (clue === 'blood') target.blood = pct;
       if (clue === 'height') { target.height = 0.82 + pct * 0.36; target.shadow = 0.8 + pct * 3.2; }
@@ -1035,7 +1035,148 @@ function makeOwl() {
       const want = watching ? Math.max(-0.6, Math.min(0.6, watching.x * 0.15)) : Math.sin(t * 0.4) * 0.5;
       head.rotation.y += (want - head.rotation.y) * Math.min(1, dt * 3);
       head.rotation.z = Math.sin(t * 0.9) * 0.08;
-      g.position.y = 6.3 + Math.abs(Math.sin(t * 0.7)) * 0.03;
+      g.position.y = (g.userData.baseY ?? 6.3) + Math.abs(Math.sin(t * 0.7)) * 0.03;
     },
   };
+}
+
+// ============================================================
+// The disguised monster: the real monster model under dark rags and a hood.
+// Every body part is shrouded until its question is answered, then the real part shows:
+// face (rot) = head, hands (blood) = arms and body, shadow (size) = legs and true size, eyes (glow) = eye colour.
+// ============================================================
+function boneRegion(name) {
+  if (/Head|Neck/.test(name)) return 0;
+  if (/Arm|Hand|Shoulder|Index|Middle|Ring|Pinky|Thumb/.test(name)) return 1;
+  if (/Leg|Foot|Toe/.test(name)) return 2;
+  return 3;
+}
+function tagRegions(mesh) {
+  const geo = mesh.geometry;
+  if (geo.getAttribute('aRegion')) return;
+  const si = geo.getAttribute('skinIndex'), sw = geo.getAttribute('skinWeight'), n = geo.getAttribute('position').count;
+  const reg = new Float32Array(n), bones = mesh.skeleton.bones.map((b) => boneRegion(b.name));
+  for (let i = 0; i < n; i++) {
+    let best = 0, bw = -1;
+    for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k); if (w > bw) { bw = w; best = si.getComponent(i, k); } }
+    reg[i] = bones[best] ?? 3;
+  }
+  geo.setAttribute('aRegion', new THREE.BufferAttribute(reg, 1));
+}
+const SHARP = { value: 0 };                                         // 1 while drawing only the uncovered, sharp parts
+function disguise(m, reveal) {
+  const prev = m.onBeforeCompile, prevKey = m.customProgramCacheKey ? m.customProgramCacheKey() : '';
+  m.onBeforeCompile = (sh, r) => {
+    if (prev) prev.call(m, sh, r);
+    sh.uniforms.uReveal = reveal; sh.uniforms.uSharp = SHARP;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aRegion;\nvarying float vRegion;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvRegion = aRegion;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec4 uReveal;\nuniform float uSharp;\nvarying float vRegion;')
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        float rv = vRegion < 0.5 ? uReveal.x : vRegion < 1.5 ? uReveal.y : vRegion < 2.5 ? uReveal.z : uReveal.w;
+        if (uSharp > 0.5 && rv < 0.5) discard;
+        float rag = 0.25 + 0.07 * fract(sin(dot(floor(vViewPosition.xy * 18.0), vec2(12.9898, 78.233))) * 43758.5453);
+        diffuseColor.rgb = mix(vec3(rag * 1.02, rag * 0.97, rag * 0.9), diffuseColor.rgb, rv);
+        diffuseColor.a = mix(1.0, diffuseColor.a, rv);
+        totalEmissiveRadiance = mix(vec3(0.025, 0.027, 0.032), totalEmissiveRadiance, rv);`);
+  };
+  m.customProgramCacheKey = () => prevKey + '|disguise';
+  m.needsUpdate = true;
+}
+function makeDisguised(cls) {
+  const ch = makeCharacter(cls), g = ch.group, spec = MONSTER_SPEC[cls];
+  const reveal = { value: new THREE.Vector4(0, 0, 0, 0) }, want = new THREE.Vector4();
+  // everything the character carries besides its own body (cape, witch eyes, ghost face and glow) waits for its reveal
+  const extras = [], wrapped = new Set();
+  g.traverse((o) => {
+    if (o.isSkinnedMesh) { tagRegions(o); if (!wrapped.has(o.material)) { wrapped.add(o.material); disguise(o.material, reveal); } return; }
+    if ((o.isMesh || o.isSprite) && !o.isSkinnedMesh) {
+      let p = o.parent, region = 0;
+      while (p && p !== g) { if (p.isBone) { region = boneRegion(p.name); break; } p = p.parent; }
+      extras.push({ o, region: region === 0 ? 0 : 3 });
+    }
+  });
+  // hats and anything on the head that would give the monster away hide with the head
+  const hats = []; g.traverse((o) => { if (o.isSkinnedMesh && /Head/.test(o.parent?.name || o.name) && /Purple|Gold/.test(o.material.name) && cls === 'Witch') hats.push(o); });
+
+  const S = spec.height / 1.86;                                   // bone holders are in metres for a 1.86 m character
+  const ragMat = mat('#6b665e', { roughness: 1, side: THREE.DoubleSide, flatShading: false, emissive: '#15161a' });
+  const hood = new THREE.Mesh(new THREE.SphereGeometry(0.19, 20, 14, Math.PI * 0.72, Math.PI * 1.56, 0, Math.PI * 0.62), ragMat);
+  hood.scale.set(1.08, 1.25, 1.18); hood.position.set(0, 0.1, -0.015); hood.castShadow = true;
+  const cowl = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.32, 0.22, 18, 1, true, Math.PI * 0.8, Math.PI * 1.4), ragMat); cowl.position.set(0, -0.06, -0.01);
+  const cavity = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), new THREE.MeshBasicMaterial({ color: '#000000' })); cavity.scale.set(1, 1.1, 0.5); cavity.position.set(0, 0.08, 0.1);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: '#2a2622', fog: false });
+  const eyes = new THREE.Group();
+  for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), eyeMat); e.position.set(sx * 0.045, 0.1, 0.16); eyes.add(e); }
+  const eyeLight = new THREE.PointLight('#ffffff', 0, 4, 1.6); eyeLight.position.set(0, 0.1, 0.5);
+  const headSet = new THREE.Group(); headSet.add(hood, cowl, cavity, eyes, eyeLight);
+  ch.attach('Head', headSet);
+  // the shadow on the path (height clue) and the aura glow (appears with the eye colour)
+  const shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.5, depthWrite: false });
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1).translate(0, 0.5, 0).rotateX(-Math.PI / 2), shadowMat); shadow.position.set(0, 0.03, 0.3); g.add(shadow);
+  const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOW, color: '#ffffff', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+  aura.scale.set(3.4, 4.6, 1); aura.position.y = 1.5 * S * WORLD_SCALE / 1.5; g.add(aura);
+  // moonlight from behind and a cold fill from the front so it reads in the dark
+  const rimLight = new THREE.SpotLight('#9fb8ff', 45, 12, 0.7, 0.6, 1.2); rimLight.position.set(-1.5, 5.5, -3.5); rimLight.target.position.set(0, 1.6, 0); g.add(rimLight, rimLight.target);
+  const fill = new THREE.PointLight('#a0acc8', 9, 9, 1.3); fill.position.set(1, 3, 3.2); g.add(fill);
+
+  // invisible zones on the bones: click a body part to ask about it
+  const zoneMat = new THREE.MeshBasicMaterial({ visible: false }), zones = [];
+  const zoneOn = (name, bone, geo, x, y, z) => { const m = new THREE.Mesh(geo, zoneMat); m.position.set(x, y, z); m.userData.zone = name; ch.attach(bone, m); zones.push(m); };
+  zoneOn('color', 'Head', new THREE.SphereGeometry(0.09, 8, 6), 0, 0.1, 0.13);
+  zoneOn('rot', 'Head', new THREE.SphereGeometry(0.17, 8, 6), 0, 0.03, 0.1);
+  zoneOn('blood', 'HandL', new THREE.SphereGeometry(0.16, 8, 6), 0, 0, 0);
+  zoneOn('blood', 'HandR', new THREE.SphereGeometry(0.16, 8, 6), 0, 0, 0);
+  zoneOn('blood', 'Chest', new THREE.CylinderGeometry(0.22, 0.22, 0.36, 8), 0, -0.05, 0.08);
+  const hz = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 3.5), zoneMat); hz.position.set(0, 0.05, 1.9); hz.userData.zone = 'height'; g.add(hz); zones.push(hz);
+  const anchors = { color: ['Head', [0, 0.12, 0.2]], rot: ['Head', [0, 0.05, 0.16]], blood: ['HandR', [0, 0, 0.05]], chest: ['Chest', [0, 0, 0.2]] }, anchorObj = {};
+  for (const [k, [bone, pos]] of Object.entries(anchors)) { const o = new THREE.Object3D(); o.position.set(...pos); ch.attach(bone, o); anchorObj[k] = o; }
+
+  const baseScale = 1 / S;                                         // every disguised monster starts the same size
+  const cur = { scale: baseScale, shadow: 1.6, hood: 1 }, tgt = { scale: baseScale, shadow: 1.6, hood: 1 };
+  let bossMul = 1, colorOn = false;
+  const bossGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOW, color: '#ff2a1a', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+  bossGlow.scale.set(5, 6.5, 1); bossGlow.position.y = 1.6; g.add(bossGlow);
+  const d = {
+    group: g, zones, fade: 1, auraLevel: 0, cls,
+    reset() {
+      ch.reset(); g.visible = false; reveal.value.set(0, 0, 0, 0); want.set(0, 0, 0, 0);
+      Object.assign(tgt, { scale: baseScale, shadow: 1.6, hood: 1 }); Object.assign(cur, tgt);
+      eyeMat.color.set('#2a2622'); eyeLight.intensity = 0; aura.material.opacity = 0; d.auraLevel = 0; colorOn = false;
+      extras.forEach((e) => { e.o.visible = false; }); hats.forEach((h) => { h.visible = false; });
+      headSet.visible = true; hood.material.opacity = 1; hood.material.transparent = false;
+    },
+    reveal(clue, m, pct) {
+      if (clue === 'rot-shadow') { tgt.hood = 0.55; want.x = 0.12; }                       // a glimpse only
+      if (clue === 'rot') { want.x = 1; tgt.hood = 0; extras.forEach((e) => { if (e.region === 0) e.o.visible = true; }); }
+      if (clue === 'blood') { want.y = 1; }
+      if (clue === 'height') { want.z = 1; tgt.scale = (0.84 + pct * 0.32) * baseScale; tgt.shadow = 0.8 + pct * 3.2; }
+      if (clue === 'color') { const c = GLOW_COLORS[m.color]; eyeMat.color.set(c); eyeLight.color.set(c); eyeLight.intensity = 3; d.auraLevel = 0.45; }
+    },
+    setAuraColor(c) { aura.material.color.set(c); },
+    // the sharp pass draws only what has been uncovered: no rags, no hood, the eyes once their colour is known
+    sharpPass(on) {
+      hood.visible = on ? false : cur.hood > 0.02; cowl.visible = cavity.visible = on ? false : cur.hood > 0.4;
+      eyes.visible = on ? colorOn : true; aura.visible = bossGlow.visible = !on;
+    },
+    setBoss(on) { bossMul = on ? 1.35 : 1; bossGlow.material.opacity = on ? 0.5 : 0; rimLight.color.set(on ? '#ff5a4a' : '#9fb8ff'); },
+    setFade(f) { d.fade = f; ch.setFade(f); },
+    zonePosition(name, out) {
+      if (name === 'height') return g.localToWorld(out.set(0, 0.2, 2.2));
+      const o = anchorObj[name] || anchorObj.chest; return o.getWorldPosition(out);
+    },
+    animate(t, dt) {
+      const k = Math.min(1, dt * 2.5);
+      reveal.value.lerp(want, k);
+      cur.scale += (tgt.scale - cur.scale) * k; cur.shadow += (tgt.shadow - cur.shadow) * k; cur.hood += (tgt.hood - cur.hood) * k;
+      g.scale.setScalar(cur.scale * bossMul); shadow.scale.z = cur.shadow;
+      if (bossMul > 1) bossGlow.material.opacity = 0.4 + 0.15 * Math.sin(t * 3);
+      if (cur.hood < 0.99) { hood.material.transparent = true; hood.material.opacity = cur.hood; cowl.visible = cavity.visible = cur.hood > 0.4; }
+      hood.visible = cur.hood > 0.02;
+      aura.material.opacity += (d.auraLevel * 0.35 - aura.material.opacity) * k;
+      ch.animate(t, 'walk', 0.9);
+    },
+  };
+  g.traverse((o) => o.layers.set(1)); shadow.layers.set(0);
+  d.reset();
+  return d;
 }

@@ -64,7 +64,7 @@
   .logo { font-size: clamp(3.4rem, 11vw, 7.5rem); color: var(--parchment); text-shadow: 0 0 24px rgba(0, 0, 0, 0.9), 0 0 40px rgba(217, 209, 193, 0.18); letter-spacing: 0.01em; }
   .logo span { color: var(--blood-bright); text-shadow: 0 0 26px rgba(158, 31, 27, 0.7), 0 2px 0 #1a0303; }
   .tagline, .title-top .eyebrow, .cast { text-shadow: 0 1px 3px #000, 0 0 14px rgba(5,8,24,.9); }
-  .tagline { font-size: clamp(1.05rem, 2.4vw, 1.3rem); max-width: 34rem; color: var(--parchment); }
+  .tagline { font-size: clamp(1.05rem, 2.4vw, 1.3rem); max-width: 44rem; color: var(--parchment); text-wrap: balance; }
   .title-bottom { display: grid; gap: 0.8rem; justify-items: start; }
   .cast { font-size: 0.85rem; color: var(--parchment-dim); letter-spacing: 0.04em; }
   #bestLine { font-size: 0.9rem; color: var(--parchment-dim); font-variant-numeric: tabular-nums; }
@@ -96,6 +96,11 @@
   .js-fill { display: block; height: 100%; background: linear-gradient(90deg, #5e0f0c, var(--blood-bright)); border-radius: 3px; }
   .jcolors { grid-template-columns: repeat(2, 1fr); gap: 0.35rem 1.2rem; }
   .jcolors li { display: flex; align-items: center; } .jcolors b { margin-left: auto; }
+  .j-rules { display: grid; gap: 0.55rem; }
+  .j-rule span { font-size: 0.9rem; } .j-rule small { color: var(--parchment-dim); }
+  .j-rule div { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 3px; }
+  .j-rule em { font-style: normal; font-size: 0.78rem; text-align: center; padding: 0.2rem 0; border-radius: 3px; background: rgba(217,209,193,.08); color: var(--parchment-dim); }
+  .j-rule em.on { background: var(--glow, var(--amber)); color: #140c03; font-weight: 700; }
 
   /* night intro, shop, end, pause */
   #nightIntro, #shop, #end, #pause { background: radial-gradient(ellipse at center, rgba(3, 4, 6, 0.35), rgba(3, 4, 6, 0.85)); }
@@ -105,6 +110,12 @@
   #end:not(.won) #endTitle { color: #ff8a80; }
   #endVersus .best { display: block; margin-top: 0.2rem; font-size: 0.85rem; color: var(--parchment-dim); }
   #endVersus { margin-top: 1rem; padding: 0.7rem 0.9rem; border-left: 2px solid var(--teal); background: rgba(95, 224, 200, 0.07); color: var(--parchment); }
+  .board { list-style: none; padding: 0; margin: 0.4rem 0 0; display: grid; gap: 0.3rem; }
+  .board h3 { margin: 1rem 0 0.3rem; }
+  .board li { display: grid; grid-template-columns: 1.6rem 1fr auto 3.2rem; gap: 0.6rem; align-items: baseline; padding: 0.3rem 0.5rem; border-radius: 3px; background: rgba(217,209,193,.05); font-variant-numeric: tabular-nums; }
+  .board li span { color: var(--parchment-dim); } .board li b { font-family: var(--display); font-weight: 400; font-size: 1.15rem; }
+  .board li em { font-style: normal; font-size: 0.85rem; color: var(--parchment-dim); } .board li time { font-size: 0.8rem; color: var(--parchment-dim); text-align: right; }
+  .board li.me { background: rgba(200,146,63,.18); outline: 1px solid rgba(200,146,63,.5); }
   .shop-coins { font-family: var(--display); font-size: 1.4rem; color: var(--amber); margin-top: 0.6rem; font-variant-numeric: tabular-nums; }
   .shop-items { list-style: none; padding: 0; margin: 1rem 0 1.2rem; display: grid; gap: 0.7rem; }
   .shop-item { display: flex; gap: 1rem; justify-content: space-between; align-items: center; border-top: 1px solid var(--panel-edge); padding-top: 0.7rem; }
@@ -114,7 +125,7 @@
   .panel .row { margin-top: 1.4rem; }
 
   /* ---------- in-game HUD: a slim top bar, one message line, and a dock at the bottom ---------- */
-  #hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; --dockW: min(52rem, calc(100% - 32px)); }
+  #hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; --dockW: min(50rem, calc(100% - 32px)); }
   #hud button, #hud .card { pointer-events: auto; }
   .topbar { position: absolute; top: 0; left: 0; right: 0; display: grid; grid-template-columns: 1fr auto 1fr; gap: 1rem; align-items: center;
     padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 14px; background: linear-gradient(180deg, rgba(3, 4, 6, 0.9), rgba(3, 4, 6, 0)); }
@@ -145,60 +156,70 @@
     font-size: 0.98rem; color: var(--parchment); animation: pop .25s ease-out; box-shadow: 0 10px 30px rgba(0,0,0,.5); pointer-events: none; }
   .banner strong { font-family: var(--display); font-weight: 400; font-size: 1.6rem; line-height: 1.1; }
   .banner span { font-size: 0.9rem; color: #ddd3b6; }
+  .banner.out { animation: fadeout .32s ease-in forwards; }
+  @keyframes fadeout { to { opacity: 0; transform: translate(-50%, -6px); } }
   .banner.owl { border-color: rgba(95, 224, 200, 0.55); color: #c9fff4; }
   .banner.good { border-color: rgba(134, 195, 126, 0.7); } .banner.good strong { color: var(--good); }
   .banner.bad { border-color: rgba(208, 68, 58, 0.8); } .banner.bad strong { color: #ff7a6e; }
   @keyframes pop { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
   /* the dock: clue chips, then the cards and the two tools */
-  #dock { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: var(--dockW); display: grid; gap: 8px; }
-  #clues { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
-  .chip { display: grid; padding: 0.3rem 0.5rem; border-radius: 4px; background: rgba(5, 6, 8, 0.78); border: 1px solid rgba(217, 209, 193, 0.14); min-width: 0; }
+  #dock { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: var(--dockW); display: grid; gap: 8px; animation: rise .5s ease-out; }
+  @keyframes rise { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  #clues { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  #clues li { display: grid; }
+  .chip { appearance: none; font: inherit; color: inherit; text-align: left; cursor: pointer; display: grid; padding: 0.35rem 0.6rem; border-radius: 4px; background: rgba(5, 6, 8, 0.8); border: 1px solid rgba(200, 146, 63, 0.35); min-width: 0; transition: border-color .15s, background .15s; }
+  .chip:hover:not(:disabled) { border-color: var(--amber); background: rgba(40, 26, 8, 0.85); }
+  .chip:disabled { cursor: default; }
+  .chip.asking { border-color: var(--amber); animation: blink 0.5s steps(2) infinite; }
   .chip-label { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--parchment-dim); }
-  .chip-value { font-size: 0.85rem; color: rgba(217, 209, 193, 0.4); font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chip-value { font-size: 0.85rem; color: rgba(217, 209, 193, 0.55); font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chip.found { border-color: rgba(200, 146, 63, 0.6); animation: reveal .8s ease-out; }
   .chip.found .chip-value { color: #ffe2a8; font-style: normal; font-weight: 700; }
   @keyframes reveal { from { background: rgba(200, 146, 63, 0.4); } to { background: rgba(5, 6, 8, 0.78); } }
-  #dockRow { display: grid; grid-template-columns: 1fr 9.5rem; gap: 10px; align-items: stretch; }
+  #dockTop { display: grid; grid-template-columns: 1fr 10.5rem; gap: 6px; align-items: stretch; }
   #tools { display: grid; gap: 8px; align-content: stretch; }
   .tool { position: relative; overflow: hidden; display: grid; place-content: center; text-align: center; gap: 0.1rem; line-height: 1.15; }
+  .tool { white-space: nowrap; }
   .tool small { font-weight: 400; font-size: 0.72rem; opacity: 0.8; }
-  #lanternBtn { border-color: var(--amber); background: linear-gradient(180deg, #e0b060, var(--amber) 55%, var(--amber-deep)); color: #1c1003; box-shadow: 0 0 20px rgba(200,146,63,.4); }
-  #lanternBtn[aria-pressed="false"] { background: #14120f; color: var(--parchment); box-shadow: none; }
-  #lanternBtn::after { content: ''; position: absolute; left: 0; bottom: 0; height: 4px; width: calc(var(--oil, 1) * 100%); background: #fff0c8; opacity: .85; }
-  #lanternBtn.low::after { background: var(--blood-bright); animation: blink 0.8s steps(2) infinite; }
-  @keyframes blink { 50% { opacity: .35; } }
+  @keyframes blink { 50% { opacity: .45; } }
   #askOracle { border-color: var(--teal); background: linear-gradient(180deg, #86ecd9, var(--teal) 60%, #2c9e8a); color: #062822; box-shadow: 0 0 16px rgba(95, 224, 200, 0.3); }
 
   /* monster cards (Guess Who style): cards the clues rule out turn face down */
   #cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
-  .card { appearance: none; border: 0; padding: 0; background: none; cursor: pointer; perspective: 700px; aspect-ratio: 3 / 4; max-height: 23vh; width: 100%; justify-self: center; }
+  .card { appearance: none; border: 0; padding: 0; background: none; cursor: pointer; perspective: 700px; aspect-ratio: 3 / 4.3; max-height: 27vh; width: 100%; justify-self: center; }
   .card:disabled { cursor: default; }
-  .card-inner { position: relative; display: block; width: 100%; height: 100%; transition: transform .55s cubic-bezier(.3,1.4,.5,1); transform-style: preserve-3d; }
+  .card-inner { position: relative; display: block; width: 100%; height: 100%; transition: transform .6s cubic-bezier(.3,1.35,.5,1) var(--d, 0ms); transform-style: preserve-3d; }
+  .card.flipped .card-inner { transition-delay: 0ms; }
   .card.flipped .card-inner { transform: rotateY(180deg); }
   .card-face, .card-back { position: absolute; inset: 0; border-radius: 6px; backface-visibility: hidden; -webkit-backface-visibility: hidden; display: grid; justify-items: center; align-content: end; overflow: hidden;
     border: 1px solid rgba(217, 209, 193, 0.28); box-shadow: 0 6px 18px rgba(0,0,0,.6); }
   .card-face { background: #0d0c0b; }
   .card-back { transform: rotateY(180deg); align-content: center; gap: 0.25rem; background: radial-gradient(ellipse at center, #1c0f0c, #070404 75%); border-color: rgba(158, 31, 27, 0.55); }
   .card-back::before { content: ''; position: absolute; inset: 22% 18%; background: linear-gradient(45deg, transparent 47%, rgba(158,31,27,.55) 48% 52%, transparent 53%), linear-gradient(-45deg, transparent 47%, rgba(158,31,27,.55) 48% 52%, transparent 53%); }
-  .c-portrait { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
+  .c-portrait { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; }
+  .c-info { position: relative; z-index: 1; width: 100%; display: grid; gap: 3px; padding: 1.6rem 6px 6px; background: linear-gradient(180deg, transparent, rgba(0,0,0,.88) 40%); }
+  .c-rules { display: grid; gap: 2px; }
+  .rule-row { display: grid; grid-template-columns: 2.5em repeat(4, 1fr); gap: 2px; align-items: center; }
+  .rule-row i { font-style: normal; font-size: 0.52rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--parchment-dim); }
+  .rule-row b { display: block; height: 6px; border-radius: 1px; background: rgba(217, 209, 193, 0.13); transition: transform .2s; }
+  .rule-row b.on { background: var(--glow, var(--amber)); }
+  .rule-row[data-answer="0"] b[data-lv="0"], .rule-row[data-answer="1"] b[data-lv="1"], .rule-row[data-answer="2"] b[data-lv="2"], .rule-row[data-answer="3"] b[data-lv="3"] { outline: 1.5px solid #fff; outline-offset: 1px; transform: scaleY(1.5); }
   .card-face::after { content: ''; position: absolute; inset: 3px; border: 1px solid rgba(200, 146, 63, 0.45); border-radius: 4px; pointer-events: none; }
-  .c-name { position: relative; z-index: 1; font-family: var(--display); font-size: 1.15rem; padding: 0 0 0.35rem; letter-spacing: 0.04em; color: #f1e7d6; text-shadow: 0 1px 3px #000, 0 0 10px #000; }
+  .c-name { position: relative; z-index: 1; text-align: center; font-family: var(--display); font-size: 1.1rem; padding: 0; letter-spacing: 0.04em; color: #f1e7d6; text-shadow: 0 1px 3px #000, 0 0 10px #000; }
   .c-weapon { position: absolute; z-index: 1; right: 6px; top: 6px; width: 26px; height: 26px; padding: 3px; border-radius: 50%; background: rgba(0,0,0,.55); border: 1px solid rgba(200,146,63,.5); object-fit: contain; }
   .c-key { position: absolute; z-index: 1; left: 7px; top: 5px; font-size: 0.72rem; color: var(--parchment-dim); font-variant-numeric: tabular-nums; }
   .c-back-name { position: relative; font-family: var(--display); font-size: 1.05rem; color: rgba(217, 209, 193, 0.5); }
-  .c-back-note { position: relative; font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--blood-bright); }
+  .c-back-note { position: relative; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--blood-bright); text-align: center; padding: 0 4px; }
   .card:hover:not(:disabled) .card-inner { transform: translateY(-5px); }
   .card.flipped:hover:not(:disabled) .card-inner { transform: rotateY(180deg) translateY(-5px); }
   .card:hover:not(:disabled) .card-face { border-color: var(--amber); box-shadow: 0 0 20px rgba(200, 146, 63, .45); }
-  .c-odds { position: absolute; z-index: 1; left: 6px; right: 6px; bottom: 2.05rem; height: 1.1rem; display: flex; align-items: center; gap: 4px; }
-  .c-odds b { font-size: 0.72rem; font-variant-numeric: tabular-nums; color: #ffe2a8; text-shadow: 0 1px 2px #000; min-width: 2.2em; text-align: right; order: 2; }
-  .c-bar { display: block; height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--amber-deep), var(--amber)); width: 0; transition: width .4s; order: 1; flex: none; max-width: calc(100% - 2.6em); }
-  .card.likely .c-odds { bottom: 2.75rem; }
-  .card.likely .card-face { border-color: #ffd48a; box-shadow: 0 0 18px rgba(255, 200, 110, .55); }
-  .card.likely .c-name::after { content: 'most likely'; display: block; font-family: var(--body); font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: #ffd48a; }
   .card.last .card-face { border-color: var(--amber); box-shadow: 0 0 26px rgba(255, 200, 110, .8); animation: pulse 1.1s ease-in-out infinite; }
   @keyframes pulse { 50% { box-shadow: 0 0 8px rgba(255, 200, 110, .3); } }
+  .card.shake { animation: shake .45s ease-in-out; }
+  @keyframes shake { 20%, 60% { transform: translateX(-6px) rotate(-2deg); } 40%, 80% { transform: translateX(6px) rotate(2deg); } }
+  .card.right .card-inner { animation: win .7s ease-out; }
+  @keyframes win { 40% { transform: translateY(-14px) scale(1.06); } }
   .card.right .card-face, .card.right .card-back { border-color: var(--good); box-shadow: 0 0 22px rgba(134, 195, 126, .7); animation: none; }
   .card.wrong .card-face, .card.wrong .card-back { border-color: var(--blood-bright); box-shadow: 0 0 22px rgba(208, 68, 58, .8); animation: none; }
   .card.answer .card-face { border-color: var(--good); border-style: dashed; }
@@ -209,15 +230,23 @@
   #ring::before { content: ''; position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(var(--amber) calc(var(--p, 0) * 360deg), rgba(217, 209, 193, 0.18) 0);
     -webkit-mask: radial-gradient(circle, transparent 23px, #000 24px); mask: radial-gradient(circle, transparent 23px, #000 24px); filter: drop-shadow(0 0 6px rgba(200,146,63,.6)); }
   #ring::after { content: attr(data-label); position: absolute; left: 50%; top: 100%; transform: translate(-50%, 4px); font-size: 0.85rem; font-weight: 700; white-space: nowrap; color: var(--amber); text-shadow: 0 1px 3px #000, 0 0 8px #000; }
+  #ring.hover::before { background: rgba(200,146,63,.35); }
   #owlMark { width: 46px; height: 46px; border-radius: 50%; border: 2px dashed var(--teal); box-shadow: 0 0 14px rgba(95,224,200,.7); animation: spin 3s linear infinite; }
   @keyframes spin { to { rotate: 360deg; } }
   #pops { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
   .clue-pop { position: absolute; left: 0; top: 0; font-family: var(--display); font-size: 1.4rem; color: #ffe2a8; white-space: nowrap; text-shadow: 0 0 10px rgba(200, 146, 63, 0.8), 0 2px 3px #000; }
   #lanternFx { position: absolute; inset: 0; pointer-events: none; z-index: 5; transition: opacity .35s; opacity: 0; background: radial-gradient(ellipse at 50% 55%, rgba(255, 170, 70, 0.07), rgba(0,0,0,0) 45%, rgba(20, 8, 0, 0.35)); }
   #lanternFx.on { opacity: 1; }
-  #hud.resolving #tools, #hud.resolving #clues { opacity: .35; transition: opacity .3s; }
+  #spyglass { position: absolute; inset: 0; pointer-events: none; z-index: 6; opacity: 0; transition: opacity .35s; background: radial-gradient(circle at 50% 45%, transparent 0, transparent 34vmin, rgba(0,0,0,.55) 38vmin, rgba(0,0,0,.92) 60vmin); }
+  #spyglass.on { opacity: 1; }
+  #dockTop { transition: opacity .3s, transform .3s; }
+  #hud.resolving #dockTop { opacity: 0; transform: translateY(12px); pointer-events: none; }
 
   #flash { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, rgba(200, 65, 59, 0) 30%, rgba(200, 65, 59, 0.6)); opacity: 0; z-index: 12; }
+  .score-pop { position: absolute; left: 50%; top: 38%; transform: translate(-50%, 0); z-index: 16; font-family: var(--display); font-size: 3.2rem; color: #ffe08a; pointer-events: none;
+    text-shadow: 0 0 18px rgba(255, 200, 90, .9), 0 3px 4px #000; animation: scorepop 1.6s ease-out forwards; }
+  @keyframes scorepop { 0% { opacity: 0; transform: translate(-50%, 20px) scale(.6); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.15); } 30% { transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -70px); } }
+  #flash.gold { background: radial-gradient(ellipse at center, rgba(255,220,140,.75), rgba(255,170,60,.25) 60%, rgba(255,170,60,0)); }
   #flash.white { background: radial-gradient(ellipse at center, rgba(255,255,255,.9), rgba(255,255,255,.5)); }
   #flash.on { animation: flash .7s ease-out; }
   @keyframes flash { 0% { opacity: 1; } 100% { opacity: 0; } }
@@ -242,13 +271,17 @@
     .banner { top: calc(92px + env(safe-area-inset-top, 0px)); font-size: 0.88rem; }
     .banner strong { font-size: 1.25rem; }
     #dock { bottom: calc(8px + env(safe-area-inset-bottom, 0px)); gap: 6px; }
-    #clues { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+    #clues { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
     .chip { padding: 0.2rem 0.4rem; } .chip-label { font-size: 0.6rem; } .chip-value { font-size: 0.76rem; }
-    #dockRow { grid-template-columns: 1fr; grid-template-areas: "tools" "cards"; gap: 6px; }
-    #cards { grid-area: cards; gap: 5px; } #tools { grid-area: tools; grid-template-columns: 1fr 1fr; }
-    .tool { padding: 0.45rem 0.4rem; font-size: 0.85rem; }
-    .card { max-height: 17vh; }
-    .c-name { font-size: 0.8rem; } .c-odds { bottom: 1.45rem; } .card.likely .c-odds { bottom: 2rem; } .c-odds b { font-size: 0.62rem; } .card.likely .c-name::after { font-size: 0.5rem; } .c-weapon { width: 20px; height: 20px; } .c-key { display: none; } .c-back-name { font-size: 0.78rem; } .c-back-note { font-size: 0.55rem; }
+    #dockTop { grid-template-columns: 1fr 4.6rem; gap: 4px; }
+    #cards { gap: 5px; }
+    .chip .ask { display: none; }
+    .title-bottom .row { gap: 0.5rem; flex-wrap: nowrap; } .title-bottom .btn { padding: 0.6rem 0.9rem; font-size: 0.92rem; white-space: nowrap; }
+    .tool { padding: 0.3rem 0.2rem; font-size: 0.8rem; } .tool small { font-size: 0.6rem; } .owl-long { display: none; }
+    .score-pop { font-size: 2.4rem; }
+    .card { max-height: 22vh; }
+    .rule-row { grid-template-columns: repeat(4, 1fr); gap: 1px; } .rule-row i { display: none; } .rule-row b { height: 4px; } .c-info { padding: 1rem 3px 4px; gap: 2px; }
+    .c-name { font-size: 0.74rem; } .c-weapon { width: 18px; height: 18px; padding: 2px; } .c-key { display: none; } .c-back-name { font-size: 0.78rem; } .c-back-note { font-size: 0.55rem; }
     .clue-pop { font-size: 1.1rem; }
     #journal { align-items: flex-end; }
     #journal .panel { max-height: 58%; max-width: none; }
@@ -277,18 +310,16 @@
     <div id="owlMark" hidden></div>
     <div id="ring" hidden></div>
     <div id="dock">
-      <ul id="clues" aria-label="Clues"></ul>
-      <div id="dockRow">
-        <nav id="cards" aria-label="Monster cards"></nav>
-        <div id="tools">
-          <button class="btn small tool" id="lanternBtn" type="button" aria-pressed="true">Lantern on</button>
-          <button class="btn small tool" id="askOracle" type="button">Ask the Owl</button>
-        </div>
+      <div id="dockTop">
+        <ul id="clues" aria-label="Questions"></ul>
+        <div id="tools"><button class="btn small tool" id="askOracle" type="button">Ask the Owl</button></div>
       </div>
+      <nav id="cards" aria-label="Monster cards"></nav>
     </div>
   </div>
   <p id="banner" class="banner" hidden role="status"></p>
   <div id="lanternFx"></div>
+  <div id="spyglass"></div>
   <div id="flash"></div>
 
   <!-- title -->
@@ -296,7 +327,7 @@
     <div class="title-top">
       <p class="eyebrow">5 nights · 5 monsters · 1 gate</p>
       <h1 class="logo">Boo <span>Who?</span></h1>
-      <p class="tagline">Light the stranger. Find the clues. Hold the gate.</p>
+      <p class="tagline">Ask four questions. Turn over the cards. Hold the gate.</p>
     </div>
     <div class="title-bottom">
       <div class="row">
@@ -304,8 +335,6 @@
         <button class="btn ghost" id="howBtn" type="button">How to play</button>
         <button class="btn ghost" id="journalBtn" type="button">Monsters</button>
       </div>
-      <p id="bestLine"></p>
-      <p class="credits">3D models by Quaternius (CC0)</p>
     </div>
   </section>
 
@@ -315,16 +344,17 @@
       <p class="eyebrow">How to play</p>
       <h2>Hold the gate for 5 nights</h2>
       <ol class="steps">
-        <li>A hooded stranger walks to your gate. Shine your lantern on it.</li>
-        <li>Hold the light on a body part for a second to find a clue: face, eyes, hands, hair or shadow. Turn the lantern off to see its aura.</li>
-        <li>Each clue turns over the monster cards it rules out. The cards left show how likely each one is.</li>
-        <li>Click the monster you think it is (keys 1 to 5). Fewer clues, more points.
+        <li>A hooded stranger walks to your gate. You have 4 questions: its face (rot), hands (blood), shadow (size) and eyes (glow).</li>
+        <li>Click a body part, or a question button, to ask. The answer shows on every card.</li>
+        <li>Each card shows its monster's rules. Lit boxes are what that monster can have. Cards that do not match turn over.</li>
+        <li>Pick the card that is left (keys 1 to 5). Fewer questions, more points.
           <div class="weapon-table">
             <div>Zombie <span>· shovel</span></div><div>Witch <span>· holy water</span></div><div>Ghost <span>· salt</span></div><div>Vampire <span>· garlic stake</span></div><div>Mummy <span>· fire torch</span></div>
           </div></li>
         <li>Wrong, or too late: the gate loses 1 of its 5 lanterns. Lose all 5 and you lose.</li>
       </ol>
-      <p class="how-extra">Stuck? Ask the Owl (key O) where to look. The lantern burns oil, so turn it off when you are not searching.</p>
+      <p class="how-extra">Only the part you ask about comes into focus. On Halloween the last monster is the Monster King: triple points, but a wrong guess costs 2 lanterns.</p>
+      <p class="how-extra">Stuck? The Owl (key O) tells you the best question to ask. If two cards still fit at the end, it tells you which one is more common. From night 3, tricksters break one of their rules, and a wrong guess on one costs nothing.</p>
       <div class="row">
         <button class="btn" id="howPlay" type="button">Start</button>
         <button class="btn ghost back-title" type="button">Back</button>
@@ -359,7 +389,7 @@
       <p class="eyebrow">Village market</p>
       <h2 id="shopTitle">Dawn</h2>
       <p id="shopSub"></p>
-      <p class="shop-coins"><span id="shopCoins">0</span> coins · oil <span id="shopOil">100/100</span></p>
+      <p class="shop-coins"><span id="shopCoins">0</span> coins</p>
       <ul class="shop-items" id="shopItems"></ul>
       <div class="row"><button class="btn" id="shopGo" type="button">Next night</button></div>
     </div>
@@ -373,6 +403,7 @@
       <p id="endText"></p>
       <dl class="facts" id="endStats"></dl>
       <p id="endVersus"></p>
+      <ol id="endBoard" class="board"></ol>
       <div class="row">
         <button class="btn" id="againBtn" type="button">Play again</button>
         <button class="btn ghost back-title" type="button">Menu</button>

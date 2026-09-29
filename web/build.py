@@ -18,6 +18,7 @@ WEB = ROOT / 'web'
 model = json.loads((WEB / 'data' / 'oracle_model.json').read_text())
 monsters = json.loads((WEB / 'data' / 'monsters.json').read_text())
 owl_any = json.loads((WEB / 'data' / 'owl_subsets.json').read_text())
+tells = json.loads((WEB / 'data' / 'tells.json').read_text())
 prep = json.loads((ROOT / 'data' / 'clean' / 'preprocessing.json').read_text())
 train = pd.read_csv(ROOT / 'data' / 'monster_train.csv')
 
@@ -55,6 +56,7 @@ module = '\n'.join([
     oracle_js,
     'const ORACLE_MODEL = ' + json.dumps(model, separators=(',', ':')) + ';',
     'const OWL_ANY = ' + json.dumps(owl_any, separators=(',', ':')) + ';',
+    'const TELLS = ' + json.dumps(tells, separators=(',', ':')) + ';',
     'const MONSTER_ROWS = ' + json.dumps(rows, separators=(',', ':')) + ';',
     'const JOURNAL = ' + json.dumps(journal, separators=(',', ':')) + ';',
     (WEB / 'src' / 'world.js').read_text(),
